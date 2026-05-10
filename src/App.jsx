@@ -725,11 +725,14 @@ function parseUploadedClients(rows) {
 }
 
 // ── 업로드 탭 ─────────────────────────────────────────────────────────────
-function UploadTab({ onPriceList, onClients }) {
-  const [status, setStatus]     = useState({ prices:null, clients:null });
+function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
+  const [status, setStatus]       = useState({ prices:null, clients:null, stock:null });
   const [xlsxReady, setXlsxReady] = useState(false);
+  const [stockPreview, setStockPreview] = useState([]); // 분석된 재고 미리보기
+  const [analyzing, setAnalyzing] = useState(false);
   const priceRef  = useRef();
   const clientRef = useRef();
+  const stockRef  = useRef();
 
   // XLSX 라이브러리 동적 로드
   useEffect(() => {
@@ -775,57 +778,173 @@ function UploadTab({ onPriceList, onClients }) {
     }
   }
 
-  const zone = (label, sub, ref, type, stat) => (
-    <div style={{ padding:"20px", borderRadius:14, border:"1px solid rgba(212,175,55,0.2)", background:"rgba(0,0,0,0.02)", marginBottom:16 }}>
-      <div style={{ fontWeight:700, color:"#b8860b", fontSize:14, marginBottom:4 }}>{label}</div>
-      <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:14, lineHeight:1.7 }}>{sub}</div>
-      <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }} onChange={e=>{ if(e.target.files[0]) handleFile(e.target.files[0], type); e.target.value=""; }} />
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        <button onClick={()=>ref.current?.click()} style={{ padding:"9px 18px", borderRadius:9, border:"1px solid rgba(212,175,55,0.4)", background:"rgba(212,175,55,0.1)", color:"#b8860b", fontSize:13, cursor:"pointer", fontWeight:700 }}>
-          📂 파일 선택 (.xlsx / .csv)
+  // 재고표 사진 → Claude API로 분석
+  async function handleStockImage(file) {
+    setAnalyzing(true);
+    setStatus(s=>({...s, stock:"🔍 AI가 재고표를 분석하는 중..."}));
+    setStockPreview([]);
+
+    try {
+      // 이미지를 base64로 변환
+      const base64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result.split(",")[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+
+      const mediaType = file.type || "image/jpeg";
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 2000,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: mediaType, data: base64 }
+              },
+              {
+                type: "text",
+                text: `이 이미지는 생두 재고표입니다. 표에서 품목명과 재고 수량(kg)을 모두 추출해주세요.
+
+반드시 아래 JSON 형식만 출력하세요 (마크다운 없이 순수 JSON):
+{"items":[{"name":"품목명","stock":숫자,"unit":"kg","available":true}]}
+
+주의사항:
+- stock은 숫자만 (단위 제외)
+- 재고가 0이거나 "품절"/"없음"이면 available:false
+- 품목명은 원문 그대로 (약어 포함)
+- 재고 수량이 명확하지 않으면 stock:-1`
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const text = (data.content || []).map(b => b.text || "").join("").trim();
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("AI 응답에서 JSON을 찾을 수 없습니다");
+
+      const parsed = JSON.parse(match[0]);
+      const items = parsed.items || [];
+
+      // stockMap 업데이트 (품목명 → 재고)
+      const newMap = {};
+      items.forEach(it => { newMap[it.name] = it; });
+      onStockMap(newMap);
+      setStockPreview(items);
+      setStatus(s=>({...s, stock:`✅ ${items.length}개 품목 재고 인식 완료`}));
+    } catch (e) {
+      setStatus(s=>({...s, stock:`❌ 분석 실패: ${e.message}`}));
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  const zone = (label, sub, ref, type, stat, accept, onChangeFn) => (
+    <div style={{ padding:"18px", borderRadius:14, border:"1px solid #e0d5b8", background:"#fffdf7", marginBottom:14 }}>
+      <div style={{ fontWeight:700, color:"#8b6914", fontSize:14, marginBottom:3 }}>{label}</div>
+      <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:12, lineHeight:1.6 }}>{sub}</div>
+      <input ref={ref} type="file" accept={accept} style={{ display:"none" }}
+        onChange={e=>{ if(e.target.files[0]) onChangeFn(e.target.files[0]); e.target.value=""; }} />
+      <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+        <button onClick={()=>ref.current?.click()} style={{
+          padding:"9px 16px", borderRadius:9, border:"1px solid #b8860b",
+          background:"#b8860b", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:700
+        }}>
+          파일 선택
         </button>
-        {stat && <span style={{ fontSize:12, color: stat.startsWith("✅")?"#69db7c":"#ff8a8a" }}>{stat}</span>}
+        {stat && <span style={{ fontSize:12, color: stat.startsWith("✅")?"#059669": stat.startsWith("🔍")?"#2563eb":"#dc2626", fontWeight:600 }}>{stat}</span>}
       </div>
     </div>
   );
 
   return (
     <div>
-      <h2 style={{ fontSize:18, fontWeight:800, color:"#b8860b", margin:"0 0 6px" }}>데이터 업로드</h2>
-      <p style={{ fontSize:12, color:"#6b5b3a", margin:"0 0 20px", lineHeight:1.7 }}>
-        엑셀(.xlsx) 또는 CSV 파일로 단가표와 거래처 목록을 불러올 수 있습니다.<br/>
-        업로드 즉시 앱에 반영됩니다.
+      <h2 style={{ fontSize:18, fontWeight:800, color:"#8b6914", margin:"0 0 6px" }}>데이터 업로드</h2>
+      <p style={{ fontSize:12, color:"#6b5b3a", margin:"0 0 18px", lineHeight:1.7 }}>
+        단가표·거래처 목록은 엑셀/CSV로, 재고표는 사진으로 업로드하세요.
       </p>
 
-      {zone(
-        "📊 단가표 업로드",
-        "1열 헤더 필수: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가\n선택 열: 재고 | 원산지 | 가공방식",
-        priceRef, "prices", status.prices
-      )}
+      {/* 재고표 사진 업로드 */}
+      <div style={{ padding:"18px", borderRadius:14, border:"2px solid #b8860b", background:"#fffbf0", marginBottom:14 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
+          <span style={{ fontSize:18 }}>📷</span>
+          <span style={{ fontWeight:800, color:"#8b6914", fontSize:15 }}>재고표 사진 업로드</span>
+          <span style={{ fontSize:10, padding:"2px 8px", borderRadius:10, background:"#b8860b", color:"#fff", fontWeight:700 }}>매일 업데이트</span>
+        </div>
+        <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:14, lineHeight:1.6 }}>
+          재고표 사진을 찍어서 올리면 AI가 자동으로 품목별 재고를 읽어옵니다.<br/>
+          발주 분석 시 재고 부족 여부를 자동으로 확인합니다.
+        </div>
+        <input ref={stockRef} type="file" accept="image/*" style={{ display:"none" }}
+          onChange={e=>{ if(e.target.files[0]) handleStockImage(e.target.files[0]); e.target.value=""; }} />
+        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+          <button onClick={()=>stockRef.current?.click()} disabled={analyzing} style={{
+            padding:"10px 18px", borderRadius:9, border:"none",
+            background: analyzing ? "#ccc" : "#b8860b",
+            color:"#fff", fontSize:13, cursor: analyzing ? "not-allowed" : "pointer", fontWeight:700
+          }}>
+            {analyzing ? "⏳ 분석 중..." : "📷 재고표 사진 선택"}
+          </button>
+          {status.stock && (
+            <span style={{ fontSize:12, color: status.stock.startsWith("✅")?"#059669": status.stock.startsWith("🔍")?"#2563eb":"#dc2626", fontWeight:600 }}>
+              {status.stock}
+            </span>
+          )}
+        </div>
 
-      {zone(
-        "🏪 거래처 목록 업로드",
-        "1열 헤더 필수: 거래처명 | 단가그룹\n선택 열: 대표자명 | 전화번호 | 담당영업사원\n단가그룹 값: COE / 하이엔드 / 스페셜 / 프리미엄",
-        clientRef, "clients", status.clients
-      )}
+        {/* 분석 결과 미리보기 */}
+        {stockPreview.length > 0 && (
+          <div style={{ marginTop:14 }}>
+            <div style={{ fontSize:11, color:"#6b5b3a", fontWeight:700, marginBottom:8 }}>
+              인식된 재고 ({stockPreview.length}개 품목)
+            </div>
+            <div style={{ maxHeight:200, overflowY:"auto", borderRadius:9, border:"1px solid #e0d5b8", background:"#fff" }}>
+              {stockPreview.map((it, i) => (
+                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 12px", borderBottom: i < stockPreview.length-1 ? "1px solid #f0ead8" : "none" }}>
+                  <span style={{ fontSize:12, color:"#1a1208" }}>{it.name}</span>
+                  <span style={{
+                    fontSize:12, fontWeight:700,
+                    color: !it.available ? "#dc2626" : it.stock < 20 ? "#d97706" : "#059669"
+                  }}>
+                    {!it.available ? "품절" : it.stock < 0 ? "확인필요" : `${it.stock}kg`}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <button onClick={()=>{ onStockMap({}); setStockPreview([]); setStatus(s=>({...s,stock:null})); }}
+              style={{ marginTop:8, padding:"5px 12px", borderRadius:7, border:"1px solid #e0d5b8", background:"transparent", color:"#9a8a6a", fontSize:11, cursor:"pointer" }}>
+              재고 초기화
+            </button>
+          </div>
+        )}
+      </div>
+
+      {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices, ".xlsx,.xls,.csv", f=>handleFile(f,"prices"))}
+      {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients, ".xlsx,.xls,.csv", f=>handleFile(f,"clients"))}
 
       {/* 양식 예시 */}
-      <div style={{ padding:"16px", borderRadius:12, background:"rgba(0,0,0,0.02)", border:"1px solid #f9f6ef" }}>
-        <div style={{ fontWeight:700, color:"#7a6a4a", fontSize:12, marginBottom:12 }}>📋 엑셀 양식 예시</div>
-        <div style={{ marginBottom:14 }}>
-          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:6, fontWeight:600 }}>단가표 시트</div>
-          <div style={{ fontFamily:"monospace", fontSize:11, color:"#7a7060", background:"rgba(0,0,0,0.03)", padding:"10px 12px", borderRadius:8, overflowX:"auto" }}>
+      <div style={{ padding:"14px", borderRadius:12, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
+        <div style={{ fontWeight:700, color:"#6b5b3a", fontSize:12, marginBottom:10 }}>📋 엑셀 양식 예시</div>
+        <div style={{ marginBottom:10 }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>단가표</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
             품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | 재고<br/>
-            에티오피아 예가체프 G1 | 22000 | 19500 | 18500 | 17000 | 120<br/>
-            콜롬비아 수프리모 EP | 17000 | 15500 | 14200 | 13000 | 200
+            ET 예가체프 G1 | 22000 | 19500 | 18500 | 17000 | 120
           </div>
         </div>
         <div>
-          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:6, fontWeight:600 }}>거래처 시트</div>
-          <div style={{ fontFamily:"monospace", fontSize:11, color:"#7a7060", background:"rgba(0,0,0,0.03)", padding:"10px 12px", borderRadius:8, overflowX:"auto" }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>거래처</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
             거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원<br/>
-            스홀리 | 홍길동 | 010-3333-7777 | COE | 전진혁<br/>
-            카페 모모 | 김철수 | 010-5555-1234 | 프리미엄 | 전진혁
+            스홀리 | 홍길동 | 010-3333-7777 | COE | 전진혁
           </div>
         </div>
       </div>
@@ -838,7 +957,8 @@ export default function App() {
   const [tab, setTab]               = useState("order");
   const [priceList, setPriceList]   = useState(INIT_PRICE_LIST);
   const [clients, setClients]       = useState(INIT_CLIENTS);
-  const [history, setHistory]       = useState([]); // 최근 발주 내역
+  const [history, setHistory]       = useState([]);
+  const [stockMap, setStockMap]     = useState({}); // 재고표 사진 분석 결과 { 품목명 → {stock, available} } // 최근 발주 내역
 
   // 발주
   const [step, setStep]             = useState("input");
@@ -977,7 +1097,7 @@ export default function App() {
       <main style={{ maxWidth:780,margin:"0 auto",padding:"22px 15px" }}>
 
         {/* ══ 업로드 탭 ══ */}
-        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} />}
+        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} stockMap={stockMap} onStockMap={setStockMap} />}
 
         {/* ══ 단가표 탭 ══ */}
         {tab==="pricelist" && (
@@ -1114,10 +1234,69 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ padding:"11px 13px",borderRadius:11,marginBottom:14,background:"rgba(0,0,0,0.02)",border:"1px solid #fff" }}>
+                <div style={{ padding:"11px 13px",borderRadius:11,marginBottom:14,background:"#f5f0e8",border:"1px solid #e0d5b8" }}>
                   <div style={{ fontSize:10,color:"#9a8a6a",marginBottom:5,fontWeight:600 }}>원본 문자</div>
-                  <div style={{ fontSize:12,color:"#6a6050",lineHeight:1.75,whiteSpace:"pre-wrap" }}>{sms}</div>
+                  <div style={{ fontSize:12,color:"#4a3820",lineHeight:1.75,whiteSpace:"pre-wrap" }}>{sms}</div>
                 </div>
+
+                {/* 재고 확인 배너 - 재고표가 업로드된 경우에만 표시 */}
+                {Object.keys(stockMap).length > 0 && items.length > 0 && (() => {
+                  const stockChecks = items.map(it => {
+                    const p = it.matched;
+                    if (!p) return null;
+                    const stockEntry = Object.entries(stockMap).find(([sName]) =>
+                      sName.includes(p.name.substring(0,6)) ||
+                      p.name.includes(sName.substring(0,6)) ||
+                      p.name.split(" ").some(w => w.length > 3 && sName.includes(w))
+                    );
+                    return { name: p.name, qty: it.qty, entry: stockEntry?.[1] || null };
+                  }).filter(Boolean);
+
+                  const warnings = stockChecks.filter(c => c.entry && (!c.entry.available || (c.entry.stock >= 0 && c.entry.stock < c.qty)));
+                  const oks      = stockChecks.filter(c => c.entry && c.entry.available && (c.entry.stock < 0 || c.entry.stock >= c.qty));
+                  const unknown  = stockChecks.filter(c => !c.entry);
+
+                  return (
+                    <div style={{ marginBottom:14, padding:"13px 14px", borderRadius:12, border:"1px solid #e0d5b8", background:"#fff" }}>
+                      <div style={{ fontWeight:700, fontSize:12, color:"#6b5b3a", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
+                        📦 재고 확인
+                        <span style={{ fontSize:10, color:"#9a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                        {warnings.map((c, i) => (
+                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#fef2f2", border:"1px solid #fca5a5" }}>
+                            <span style={{ fontSize:12, color:"#1a1208", fontWeight:500 }}>{c.name}</span>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:11, fontWeight:700, color:"#dc2626" }}>
+                                {!c.entry.available ? "⚠ 품절" : `재고 ${c.entry.stock}kg`}
+                              </div>
+                              <div style={{ fontSize:10, color:"#9a8a6a" }}>
+                                발주 {c.qty}kg {!c.entry.available ? "→ 발주 불가" : `→ ${c.entry.stock - c.qty}kg 부족`}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {oks.map((c, i) => (
+                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#f0fdf4", border:"1px solid #86efac" }}>
+                            <span style={{ fontSize:12, color:"#1a1208", fontWeight:500 }}>{c.name}</span>
+                            <div style={{ textAlign:"right" }}>
+                              <div style={{ fontSize:11, fontWeight:700, color:"#059669" }}>
+                                {c.entry.stock < 0 ? "재고 확인필요" : `재고 ${c.entry.stock}kg ✓`}
+                              </div>
+                              <div style={{ fontSize:10, color:"#9a8a6a" }}>발주 {c.qty}kg → 발주 가능</div>
+                            </div>
+                          </div>
+                        ))}
+                        {unknown.map((c, i) => (
+                          <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#fafaf9", border:"1px solid #e7e5e4" }}>
+                            <span style={{ fontSize:12, color:"#6b5b3a" }}>{c.name}</span>
+                            <span style={{ fontSize:11, color:"#9a8a6a" }}>재고표 미매칭</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 품목 선택 필요 — 원산지만 감지된 경우 */}
                 {ambiguous.length > 0 && (
