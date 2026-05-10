@@ -860,7 +860,7 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
       // (HEIC/대용량 사진 대응)
       const base64 = await resizeImageToBase64(file);
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/api/claude", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
