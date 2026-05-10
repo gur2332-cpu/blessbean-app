@@ -795,17 +795,46 @@ function parseUploadedClients(rows) {
   return result.length > 0 ? { items: result, unresolved } : null;
 }
 
+// ── 재고표 엑셀 파서 ─────────────────────────────────────────────────────
+// 품목명 + 판매가능수량(맨 오른쪽 두 번째 열) → { 품목명: {stock, available} }
+function parseStockExcel(rows) {
+  if (!rows || rows.length < 2) return null;
+
+  // 헤더 행 찾기
+  const headerIdx = findHeaderRow(rows, ["품목", "name", "판매", "가능", "재고", "수량"]);
+  const headers = rows[headerIdx].map(h => cellStr(h).toLowerCase());
+
+  const nameIdx = headers.findIndex(h => /품목명?|상품명?|name/i.test(h));
+  if (nameIdx === -1) return null;
+
+  // 판매가능수량 열: "판매가능" or "판매 가능" or "가용" or "잔여" 우선,
+  // 없으면 맨 오른쪽에서 두 번째 숫자 열
+  let stockIdx = headers.findIndex(h => /판매.*가능|가용|잔여|available/i.test(h));
+  if (stockIdx === -1) {
+    // 마지막 열에서 두 번째 — 실제 재고표 기준
+    stockIdx = rows[headerIdx].length - 2;
+    if (stockIdx <= nameIdx) stockIdx = rows[headerIdx].length - 1;
+  }
+
+  const result = {};
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const name = cellStr(r[nameIdx]);
+    if (!name) continue;
+    const stock = cellNum(r[stockIdx]);
+    result[name] = { stock, available: stock > 0, unit: "kg" };
+  }
+  return result;
+}
+
 // ── 업로드 탭 ─────────────────────────────────────────────────────────────
-function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
-  const [status, setStatus]       = useState({ prices:null, clients:null, stock:null });
+function UploadTab({ onPriceList, onClients, onStockMap }) {
+  const [status, setStatus]     = useState({ prices:null, clients:null, stock:null });
   const [xlsxReady, setXlsxReady] = useState(false);
-  const [stockPreview, setStockPreview] = useState([]); // 분석된 재고 미리보기
-  const [analyzing, setAnalyzing] = useState(false);
   const priceRef  = useRef();
   const clientRef = useRef();
   const stockRef  = useRef();
 
-  // XLSX 라이브러리 동적 로드
   useEffect(() => {
     setXlsxReady(true); return;
     setXlsxReady(true);
@@ -832,135 +861,46 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
         return;
       }
       onPriceList(parsed.items);
-      const recognized = parsed.recognized || [];
-      setStatus(s=>({...s, prices:`✅ ${parsed.items.length}개 품목 불러옴 (인식 열: ${recognized.join(", ")})`}));
-    } else {
+      setStatus(s=>({...s, prices:`✅ ${parsed.items.length}개 품목 불러옴`}));
+
+    } else if (type === "clients") {
       const parsed = parseUploadedClients(rows);
       if (!parsed || !parsed.items || parsed.items.length === 0) {
-        setStatus(s=>({...s, clients:"❌ 인식 실패 — 헤더에 '거래처명', '전화번호', '단가그룹' 이 포함됐는지 확인하세요."}));
+        setStatus(s=>({...s, clients:"❌ 인식 실패 — 헤더에 '거래처명', '단가그룹' 이 포함됐는지 확인하세요."}));
         return;
       }
       onClients(parsed.items);
       const warn = parsed.unresolved || [];
-      const warnMsg = warn.length > 0
-        ? ` ⚠️ 그룹 인식 실패 ${warn.length}건 (스페셜로 처리): ${warn.map(w=>`${w.name}="${w.rawGroup}"`).join(", ")}`
-        : "";
+      const warnMsg = warn.length > 0 ? ` ⚠️ 그룹 인식 실패 ${warn.length}건` : "";
       setStatus(s=>({...s, clients:`✅ ${parsed.items.length}개 거래처 불러옴${warnMsg}`}));
+
+    } else if (type === "stock") {
+      // 재고표 엑셀 파싱 — 품목명 + 판매가능수량(맨 오른쪽 두 번째 열)
+      const parsed = parseStockExcel(rows);
+      if (!parsed || Object.keys(parsed).length === 0) {
+        setStatus(s=>({...s, stock:"❌ 인식 실패 — '품목명' 열과 재고 수량 열이 있는지 확인하세요."}));
+        return;
+      }
+      onStockMap(parsed);
+      const cnt = Object.keys(parsed).length;
+      setStatus(s=>({...s, stock:`✅ ${cnt}개 품목 재고 불러옴`}));
     }
   }
 
-  // 재고표 사진 → Claude API로 분석
-  async function handleStockImage(file) {
-    setAnalyzing(true);
-    setStatus(s=>({...s, stock:"🔍 AI가 재고표를 분석하는 중..."}));
-    setStockPreview([]);
-
-    try {
-      // 이미지를 Canvas로 리사이즈 후 JPEG base64 변환
-      // (HEIC/대용량 사진 대응)
-      const base64 = await resizeImageToBase64(file);
-
-      const response = await fetch("/api/claude", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: "image/jpeg", data: base64 }
-              },
-              {
-                type: "text",
-                text: `이 이미지는 생두 재고표입니다.
-
-표에서 다음 두 가지 정보를 추출하세요:
-1. 품목명 (첫 번째 또는 두 번째 열)
-2. 판매 가능 수량 (맨 오른쪽에서 두 번째 열, 단위 kg)
-
-반드시 아래 JSON 형식만 출력하세요 (마크다운 없이 순수 JSON):
-{"items":[{"name":"품목명","stock":숫자,"unit":"kg","available":true}]}
-
-주의사항:
-- stock은 숫자만 (쉼표, 단위 모두 제거하고 숫자만)
-- 재고가 0이거나 빈 칸이면 available:false, stock:0
-- 품목명은 원문 그대로 (국가코드, 등급, 가공방식 등 모두 포함)
-- "판매 가능 수량" 또는 "가용 수량" 또는 "잔여 수량" 열을 사용
-- 해당 열이 없으면 가장 오른쪽 숫자 열 사용
-- 모든 행을 빠짐없이 추출`
-              }
-            ]
-          }]
-        })
-      });
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message || "API 오류");
-      const text = (data.content || []).map(b => b.text || "").join("").trim();
-      const match = text.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error("AI 응답에서 JSON을 찾을 수 없습니다");
-
-      const parsed = JSON.parse(match[0]);
-      const items = parsed.items || [];
-
-      const newMap = {};
-      items.forEach(it => { newMap[it.name] = it; });
-      onStockMap(newMap);
-      setStockPreview(items);
-      setStatus(s=>({...s, stock:`✅ ${items.length}개 품목 재고 인식 완료`}));
-    } catch (e) {
-      setStatus(s=>({...s, stock:`❌ 분석 실패: ${e.message}`}));
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  // 이미지 → Canvas 리사이즈 → JPEG base64
-  // HEIC 포함 모든 포맷 대응, 최대 2000px로 축소
-  function resizeImageToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const MAX = 2000;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-          else       { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-        resolve(dataUrl.split(",")[1]);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error("이미지 로드 실패 — 파일이 손상됐거나 지원하지 않는 형식입니다"));
-      };
-      img.src = url;
-    });
-  }
-
-  const zone = (label, sub, ref, type, stat, accept, onChangeFn) => (
+  const zone = (label, sub, ref, type, stat) => (
     <div style={{ padding:"18px", borderRadius:14, border:"1px solid #e0d5b8", background:"#fffdf7", marginBottom:14 }}>
       <div style={{ fontWeight:700, color:"#8b6914", fontSize:14, marginBottom:3 }}>{label}</div>
       <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:12, lineHeight:1.6 }}>{sub}</div>
-      <input ref={ref} type="file" accept={accept} style={{ display:"none" }}
-        onChange={e=>{ if(e.target.files[0]) onChangeFn(e.target.files[0]); e.target.value=""; }} />
+      <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
+        onChange={e=>{ if(e.target.files[0]) handleFile(e.target.files[0], type); e.target.value=""; }} />
       <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         <button onClick={()=>ref.current?.click()} style={{
-          padding:"9px 16px", borderRadius:9, border:"1px solid #b8860b",
+          padding:"9px 16px", borderRadius:9, border:"none",
           background:"#b8860b", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:700
-        }}>
-          파일 선택
-        </button>
-        {stat && <span style={{ fontSize:12, color: stat.startsWith("✅")?"#059669": stat.startsWith("🔍")?"#2563eb":"#dc2626", fontWeight:600 }}>{stat}</span>}
+        }}>파일 선택</button>
+        {stat && <span style={{ fontSize:12, fontWeight:600,
+          color: stat.startsWith("✅") ? "#059669" : stat.startsWith("⏳") ? "#2563eb" : "#dc2626"
+        }}>{stat}</span>}
       </div>
     </div>
   );
@@ -969,70 +909,23 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
     <div>
       <h2 style={{ fontSize:18, fontWeight:800, color:"#8b6914", margin:"0 0 6px" }}>데이터 업로드</h2>
       <p style={{ fontSize:12, color:"#6b5b3a", margin:"0 0 18px", lineHeight:1.7 }}>
-        단가표·거래처 목록은 엑셀/CSV로, 재고표는 사진으로 업로드하세요.
+        엑셀(.xlsx) 또는 CSV 파일로 업로드하세요. 업로드 즉시 앱에 반영됩니다.
       </p>
 
-      {/* 재고표 사진 업로드 */}
-      <div style={{ padding:"18px", borderRadius:14, border:"2px solid #b8860b", background:"#fffbf0", marginBottom:14 }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:3 }}>
-          <span style={{ fontSize:18 }}>📷</span>
-          <span style={{ fontWeight:800, color:"#8b6914", fontSize:15 }}>재고표 사진 업로드</span>
-          <span style={{ fontSize:10, padding:"2px 8px", borderRadius:10, background:"#b8860b", color:"#fff", fontWeight:700 }}>매일 업데이트</span>
-        </div>
-        <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:14, lineHeight:1.6 }}>
-          재고표 사진을 찍어서 올리면 AI가 자동으로 품목별 재고를 읽어옵니다.<br/>
-          발주 분석 시 재고 부족 여부를 자동으로 확인합니다.
-        </div>
-        <input ref={stockRef} type="file" accept="image/*" style={{ display:"none" }}
-          onChange={e=>{ if(e.target.files[0]) handleStockImage(e.target.files[0]); e.target.value=""; }} />
-        <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-          <button onClick={()=>stockRef.current?.click()} disabled={analyzing} style={{
-            padding:"10px 18px", borderRadius:9, border:"none",
-            background: analyzing ? "#ccc" : "#b8860b",
-            color:"#fff", fontSize:13, cursor: analyzing ? "not-allowed" : "pointer", fontWeight:700
-          }}>
-            {analyzing ? "⏳ 분석 중..." : "📷 재고표 사진 선택"}
-          </button>
-          {status.stock && (
-            <span style={{ fontSize:12, color: status.stock.startsWith("✅")?"#059669": status.stock.startsWith("🔍")?"#2563eb":"#dc2626", fontWeight:600 }}>
-              {status.stock}
-            </span>
-          )}
-        </div>
+      {zone("📦 재고표 업로드", "헤더: 품목명 | 판매가능수량 (매일 업데이트)", stockRef, "stock", status.stock)}
+      {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices)}
+      {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients)}
 
-        {/* 분석 결과 미리보기 */}
-        {stockPreview.length > 0 && (
-          <div style={{ marginTop:14 }}>
-            <div style={{ fontSize:11, color:"#6b5b3a", fontWeight:700, marginBottom:8 }}>
-              인식된 재고 ({stockPreview.length}개 품목)
-            </div>
-            <div style={{ maxHeight:200, overflowY:"auto", borderRadius:9, border:"1px solid #e0d5b8", background:"#fff" }}>
-              {stockPreview.map((it, i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 12px", borderBottom: i < stockPreview.length-1 ? "1px solid #f0ead8" : "none" }}>
-                  <span style={{ fontSize:12, color:"#1a1208" }}>{it.name}</span>
-                  <span style={{
-                    fontSize:12, fontWeight:700,
-                    color: !it.available ? "#dc2626" : it.stock < 20 ? "#d97706" : "#059669"
-                  }}>
-                    {!it.available ? "품절" : it.stock < 0 ? "확인필요" : `${it.stock}kg`}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <button onClick={()=>{ onStockMap({}); setStockPreview([]); setStatus(s=>({...s,stock:null})); }}
-              style={{ marginTop:8, padding:"5px 12px", borderRadius:7, border:"1px solid #e0d5b8", background:"transparent", color:"#9a8a6a", fontSize:11, cursor:"pointer" }}>
-              재고 초기화
-            </button>
-          </div>
-        )}
-      </div>
-
-      {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices, ".xlsx,.xls,.csv", f=>handleFile(f,"prices"))}
-      {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients, ".xlsx,.xls,.csv", f=>handleFile(f,"clients"))}
-
-      {/* 양식 예시 */}
       <div style={{ padding:"14px", borderRadius:12, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
         <div style={{ fontWeight:700, color:"#6b5b3a", fontSize:12, marginBottom:10 }}>📋 엑셀 양식 예시</div>
+        <div style={{ marginBottom:10 }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>재고표</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
+            품목명 | ... | 판매가능수량<br/>
+            ET 예가체프 G1 | ... | 120<br/>
+            BR 세하도 NY2 | ... | 85
+          </div>
+        </div>
         <div style={{ marginBottom:10 }}>
           <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>단가표</div>
           <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
@@ -1197,7 +1090,7 @@ export default function App() {
       <main style={{ maxWidth:780,margin:"0 auto",padding:"22px 15px" }}>
 
         {/* ══ 업로드 탭 ══ */}
-        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} stockMap={stockMap} onStockMap={setStockMap} />}
+        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} onStockMap={setStockMap} />}
 
         {/* ══ 단가표 탭 ══ */}
         {tab==="pricelist" && (
