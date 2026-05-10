@@ -304,6 +304,31 @@ function buildPlainText(analysis, items, group, clientName) {
   ].join("\n");
 }
 
+// ── 물류팀 오더방용 텍스트 생성 ─────────────────────────────────────────
+function buildOrderText(items, group, clientName, analysis) {
+  const displayName = clientName || analysis.sender_name || "";
+  const totalQty    = items.reduce((s,it) => s+it.qty, 0);
+  const delivFee    = totalQty < 20 ? DELIVERY_FEE : 0;
+  const subtotal    = items.reduce((s,it) => s+getPrice(it.matched,group)*it.qty, 0);
+  const total       = subtotal + delivFee;
+
+  return [
+    "─".repeat(30),
+    displayName,
+    "",
+    ...items.map(it => {
+      const p  = it.matched;
+      const pr = getPrice(p, group);
+      return p
+        ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원`
+        : `${it.product_name} ${it.qty}kg * 확인필요`;
+    }),
+    "",
+    `총 금액 ${total.toLocaleString()}원`,
+    "─".repeat(30),
+  ].join("\n");
+}
+
 // ── 복사 유틸 ─────────────────────────────────────────────────────────────
 function copyToClipboard(text, onDone) {
   if (navigator.clipboard?.writeText) {
@@ -341,52 +366,102 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
   const subtotal = items.reduce((s,it)=>s+getPrice(it.matched,group)*it.qty,0);
   const total    = subtotal + delivFee;
   const displayName = clientName || analysis.sender_name || "";
-  const plain = buildPlainText(analysis, items, group, clientName);
+  const plainClient = buildPlainText(analysis, items, group, clientName);
+  const plainOrder  = buildOrderText(items, group, clientName, analysis);
+
+  const [copyTab, setCopyTab] = useState("client"); // "client" | "order"
+  const [copied, setCopied]   = useState(false);
+
+  function handleCopy() {
+    const text = copyTab === "client" ? plainClient : plainOrder;
+    copyToClipboard(text, () => { setCopied(true); setTimeout(()=>setCopied(false), 2000); });
+  }
 
   return (
     <div style={{ borderRadius:16, border:`2px solid ${G.color}44`, background:"#fffdf7", overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.08)" }}>
-      <div style={{ padding:"12px 18px", background:`linear-gradient(135deg,${G.bg},transparent)`, borderBottom:`1px solid ${G.color}33`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <span style={{ fontWeight:800, color:"#b8860b", fontSize:13 }}>📄 블레스빈 단가 안내</span>
-          <span style={{ padding:"2px 9px", borderRadius:10, fontSize:11, fontWeight:700, background:G.bg, color:G.color }}>{G.label}</span>
+      {/* 발주폼 헤더 + 탭 */}
+      <div style={{ padding:"12px 14px", background:`linear-gradient(135deg,${G.bg},#fffdf7)`, borderBottom:`1px solid ${G.color}33` }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontWeight:800, color:"#8b6914", fontSize:13 }}>📄 발주폼</span>
+            <span style={{ padding:"2px 9px", borderRadius:10, fontSize:11, fontWeight:700, background:G.bg, color:G.color }}>{G.label}</span>
+          </div>
         </div>
-        <CopyBtn text={plain} />
+        {/* 복사 탭 선택 */}
+        <div style={{ display:"flex", gap:6, marginBottom:10 }}>
+          <button onClick={()=>{ setCopyTab("client"); setCopied(false); }} style={{
+            flex:1, padding:"7px 10px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", border:"none",
+            background: copyTab==="client" ? "#8b6914" : "#f0ead8",
+            color: copyTab==="client" ? "#fff" : "#6b5b3a",
+          }}>거래처 발송용</button>
+          <button onClick={()=>{ setCopyTab("order"); setCopied(false); }} style={{
+            flex:1, padding:"7px 10px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", border:"none",
+            background: copyTab==="order" ? "#8b6914" : "#f0ead8",
+            color: copyTab==="order" ? "#fff" : "#6b5b3a",
+          }}>물류팀 오더방용</button>
+        </div>
+        {/* 복사 버튼 */}
+        <button onClick={handleCopy} style={{
+          width:"100%", padding:"9px", borderRadius:9, border:"none",
+          background: copied ? "#059669" : "#b8860b",
+          color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", transition:"background 0.2s",
+        }}>
+          {copied ? "✓ 복사됨!" : copyTab === "client" ? "📋 거래처 발송용 복사" : "📋 물류팀 오더방용 복사"}
+        </button>
       </div>
-      <div style={{ padding:"22px 20px", lineHeight:2.1, fontSize:14 }}>
-        <div style={{ color:"#5a4830", marginBottom:16 }}>
-          <div>안녕하세요.</div><div>바른생각</div><div>다른커피</div>
-          <div>블레스빈 전진혁입니다.</div><div>요청하신 단가 안내드립니다.</div>
-        </div>
-        <div style={{ borderTop:"1px dashed rgba(212,175,55,0.18)", margin:"4px 0 14px" }} />
-        {displayName && <div style={{ fontWeight:800, color:"#1a1208", marginBottom:12 }}>{displayName}</div>}
-        <div style={{ marginBottom:16 }}>
-          {items.length===0 && <div style={{ padding:"16px", textAlign:"center", color:"#6b5b3a", fontSize:13, background:"rgba(0,0,0,0.02)", borderRadius:8 }}>품목 없음 — 항목 편집에서 추가하세요</div>}
-          {items.map((it,i) => { const p=it.matched; const pr=getPrice(p,group); const lp=p?pr*it.qty:null; return (
-            <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", marginBottom:5, borderRadius:8, background:p?"rgba(212,175,55,0.05)":"rgba(255,120,80,0.06)", border:`1px solid ${p?"rgba(212,175,55,0.18)":"rgba(255,120,80,0.3)"}` }}>
-              <span style={{ color:p?"#1a1208":"#ff9a7a" }}>{p?<>{p.name}</>:<>{it.product_name}<span style={{fontSize:11,marginLeft:4}}>(확인필요)</span></>}</span>
-              <div style={{ textAlign:"right", marginLeft:12 }}>
-                <div style={{ color:G.color, fontWeight:700, whiteSpace:"nowrap" }}>{it.qty}kg * {p?`${pr.toLocaleString()}원`:"확인필요"}</div>
-                {lp && <div style={{ fontSize:11, color:"#6b5b3a" }}>= {lp.toLocaleString()}원</div>}
+      {/* 미리보기 본문 */}
+      {copyTab === "client" ? (
+        <div style={{ padding:"22px 20px", lineHeight:2.1, fontSize:14 }}>
+          <div style={{ color:"#5a4830", marginBottom:16 }}>
+            <div>안녕하세요.</div><div>바른생각</div><div>다른커피</div>
+            <div>블레스빈 전진혁입니다.</div><div>요청하신 단가 안내드립니다.</div>
+          </div>
+          <div style={{ borderTop:"1px dashed #d4c49a", margin:"4px 0 14px" }} />
+          {displayName && <div style={{ fontWeight:800, color:"#1a1208", marginBottom:12 }}>{displayName}</div>}
+          <div style={{ marginBottom:16 }}>
+            {items.length===0 && <div style={{ padding:"16px", textAlign:"center", color:"#6b5b3a", fontSize:13, background:"#f5f0e8", borderRadius:8 }}>품목 없음 — 항목 편집에서 추가하세요</div>}
+            {items.map((it,i) => { const p=it.matched; const pr=getPrice(p,group); const lp=p?pr*it.qty:null; return (
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", marginBottom:5, borderRadius:8, background:p?"rgba(184,134,11,0.05)":"rgba(255,120,80,0.06)", border:`1px solid ${p?"#d4c49a":"rgba(255,120,80,0.3)"}` }}>
+                <span style={{ color:p?"#1a1208":"#dc2626", fontSize:13 }}>{p?p.name:<>{it.product_name}<span style={{fontSize:11,marginLeft:4}}>(확인필요)</span></>}</span>
+                <div style={{ textAlign:"right", marginLeft:12 }}>
+                  <div style={{ color:G.color, fontWeight:700, whiteSpace:"nowrap", fontSize:13 }}>{it.qty}kg * {p?`${pr.toLocaleString()}원`:"확인필요"}</div>
+                  {lp && <div style={{ fontSize:11, color:"#6b5b3a" }}>= {lp.toLocaleString()}원</div>}
+                </div>
               </div>
+            );})}
+          </div>
+          <div style={{ borderTop:"1px dashed #d4c49a", paddingTop:12 }}>
+            {delivFee > 0
+              ? <div style={{ fontSize:13, color:"#6b5b3a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원 <span style={{fontSize:10,color:"#9a8a6a"}}>(20kg 미만)</span></div>
+              : totalQty>=20 ? <div style={{ fontSize:13, color:"#059669", marginBottom:6 }}>✓ 배송비 무료 ({totalQty}kg)</div> : null
+            }
+            <div style={{ fontSize:18, fontWeight:900, color:"#8b6914", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
+            <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
+              *계좌번호 1006-901-483313 우리은행 블레스빈
             </div>
-          );})}
-        </div>
-        <div style={{ borderTop:"1px dashed rgba(212,175,55,0.18)", paddingTop:12 }}>
-          {delivFee > 0
-            ? <div style={{ fontSize:13, color:"#6b5b3a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원 <span style={{fontSize:10,color:"#9a8a6a"}}>(20kg 미만)</span></div>
-            : totalQty>=20
-              ? <div style={{ fontSize:13, color:"#69db7c", marginBottom:6 }}>✓ 배송비 무료 <span style={{fontSize:10,color:"#9a8a6a"}}>({totalQty}kg)</span></div>
-              : null
-          }
-          <div style={{ fontSize:18, fontWeight:900, color:"#b8860b", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
-          <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"rgba(0,0,0,0.03)", border:"1px solid #f9f6ef" }}>
-            *계좌번호 1006-901-483313 우리은행 블레스빈
-          </div>
-          <div style={{ fontSize:12, color:"#6b5b3a", lineHeight:2.2 }}>
-            <div>* 14시 전 입금시 당일출고</div><div>* 입금 확인문자 부탁드립니다</div>
+            <div style={{ fontSize:12, color:"#6b5b3a", lineHeight:2.2 }}>
+              <div>* 14시 전 입금시 당일출고</div><div>* 입금 확인문자 부탁드립니다</div>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        /* 물류팀 오더방용 미리보기 */
+        <div style={{ padding:"20px", fontFamily:"monospace" }}>
+          <div style={{ fontSize:12, color:"#9a8a6a", marginBottom:10 }}>물류팀 오더방에 전달할 내용입니다.</div>
+          <div style={{ background:"#f5f0e8", borderRadius:10, padding:"16px", border:"1px solid #e0d5b8", lineHeight:2, fontSize:13, color:"#1a1208", whiteSpace:"pre-wrap" }}>
+            {"─".repeat(20)}{"\n"}
+            {displayName}{"\n"}
+            {"\n"}
+            {items.map(it => {
+              const p=it.matched; const pr=getPrice(p,group);
+              return (p ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원` : `${it.product_name} ${it.qty}kg * 확인필요`);
+            }).join("\n")}{"\n"}
+            {"\n"}
+            {`총 금액 ${total.toLocaleString()}원`}{"\n"}
+            {"─".repeat(20)}
+          </div>
+        </div>
+      )}
       <div style={{ padding:"7px 18px", borderTop:"1px solid #fff", display:"flex", justifyContent:"space-between", fontSize:10, color:"#aaa090" }}>
         <span>{orderNo}</span><span>{orderDate}</span>
       </div>
@@ -810,16 +885,22 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
               },
               {
                 type: "text",
-                text: `이 이미지는 생두 재고표입니다. 표에서 품목명과 재고 수량(kg)을 모두 추출해주세요.
+                text: `이 이미지는 생두 재고표입니다.
+
+표에서 다음 두 가지 정보를 추출하세요:
+1. 품목명 (첫 번째 또는 두 번째 열)
+2. 판매 가능 수량 (맨 오른쪽에서 두 번째 열, 단위 kg)
 
 반드시 아래 JSON 형식만 출력하세요 (마크다운 없이 순수 JSON):
 {"items":[{"name":"품목명","stock":숫자,"unit":"kg","available":true}]}
 
 주의사항:
-- stock은 숫자만 (단위 제외)
-- 재고가 0이거나 "품절"/"없음"이면 available:false
-- 품목명은 원문 그대로 (약어 포함)
-- 재고 수량이 명확하지 않으면 stock:-1`
+- stock은 숫자만 (쉼표, 단위 모두 제거하고 숫자만)
+- 재고가 0이거나 빈 칸이면 available:false, stock:0
+- 품목명은 원문 그대로 (국가코드, 등급, 가공방식 등 모두 포함)
+- "판매 가능 수량" 또는 "가용 수량" 또는 "잔여 수량" 열을 사용
+- 해당 열이 없으면 가장 오른쪽 숫자 열 사용
+- 모든 행을 빠짐없이 추출`
               }
             ]
           }]
