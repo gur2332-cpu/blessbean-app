@@ -313,7 +313,6 @@ function buildOrderText(items, group, clientName, analysis) {
   const total       = subtotal + delivFee;
 
   return [
-    "─".repeat(30),
     displayName,
     "",
     ...items.map(it => {
@@ -325,7 +324,6 @@ function buildOrderText(items, group, clientName, analysis) {
     }),
     "",
     `총 금액 ${total.toLocaleString()}원`,
-    "─".repeat(30),
   ].join("\n");
 }
 
@@ -449,7 +447,6 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
         <div style={{ padding:"20px", fontFamily:"monospace" }}>
           <div style={{ fontSize:12, color:"#9a8a6a", marginBottom:10 }}>물류팀 오더방에 전달할 내용입니다.</div>
           <div style={{ background:"#f5f0e8", borderRadius:10, padding:"16px", border:"1px solid #e0d5b8", lineHeight:2, fontSize:13, color:"#1a1208", whiteSpace:"pre-wrap" }}>
-            {"─".repeat(20)}{"\n"}
             {displayName}{"\n"}
             {"\n"}
             {items.map(it => {
@@ -457,8 +454,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
               return (p ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원` : `${it.product_name} ${it.qty}kg * 확인필요`);
             }).join("\n")}{"\n"}
             {"\n"}
-            {`총 금액 ${total.toLocaleString()}원`}{"\n"}
-            {"─".repeat(20)}
+            {`총 금액 ${total.toLocaleString()}원`}
           </div>
         </div>
       )}
@@ -860,15 +856,9 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
     setStockPreview([]);
 
     try {
-      // 이미지를 base64로 변환
-      const base64 = await new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result.split(",")[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
-
-      const mediaType = file.type || "image/jpeg";
+      // 이미지를 Canvas로 리사이즈 후 JPEG base64 변환
+      // (HEIC/대용량 사진 대응)
+      const base64 = await resizeImageToBase64(file);
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -881,7 +871,7 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
             content: [
               {
                 type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64 }
+                source: { type: "base64", media_type: "image/jpeg", data: base64 }
               },
               {
                 type: "text",
@@ -908,6 +898,7 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
       });
 
       const data = await response.json();
+      if (data.error) throw new Error(data.error.message || "API 오류");
       const text = (data.content || []).map(b => b.text || "").join("").trim();
       const match = text.match(/\{[\s\S]*\}/);
       if (!match) throw new Error("AI 응답에서 JSON을 찾을 수 없습니다");
@@ -915,7 +906,6 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
       const parsed = JSON.parse(match[0]);
       const items = parsed.items || [];
 
-      // stockMap 업데이트 (품목명 → 재고)
       const newMap = {};
       items.forEach(it => { newMap[it.name] = it; });
       onStockMap(newMap);
@@ -926,6 +916,35 @@ function UploadTab({ onPriceList, onClients, stockMap, onStockMap }) {
     } finally {
       setAnalyzing(false);
     }
+  }
+
+  // 이미지 → Canvas 리사이즈 → JPEG base64
+  // HEIC 포함 모든 포맷 대응, 최대 2000px로 축소
+  function resizeImageToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 2000;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else       { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        resolve(dataUrl.split(",")[1]);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("이미지 로드 실패 — 파일이 손상됐거나 지원하지 않는 형식입니다"));
+      };
+      img.src = url;
+    });
   }
 
   const zone = (label, sub, ref, type, stat, accept, onChangeFn) => (
