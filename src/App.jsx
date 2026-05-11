@@ -246,13 +246,14 @@ function parseLocally(message, priceList) {
 }
 
 
-// ── 발주폼 plain text 생성 (복사용) ─────────────────────────────────────
-function buildPlainText(analysis, items, group, clientName) {
+// ── 거래처 발송용 텍스트 생성 (복사용) ──────────────────────────────────
+function buildPlainText(analysis, items, group, clientName, payMethod="account") {
   const displayName = clientName || analysis.sender_name || "";
   const totalQty   = items.reduce((s,it)=>s+it.qty,0);
   const delivFee   = totalQty < 20 ? DELIVERY_FEE : 0;
   const subtotal   = items.reduce((s,it)=>s+getPrice(it.matched,group)*it.qty,0);
   const total      = subtotal + delivFee;
+  const isCard     = payMethod === "card";
   return [
     "안녕하세요.",
     "바른생각",
@@ -270,20 +271,26 @@ function buildPlainText(analysis, items, group, clientName) {
     ...(delivFee > 0 ? [`*배송비 ${delivFee.toLocaleString()}원`, ""] : []),
     `총 금액 ${total.toLocaleString()}원`,
     "",
-    "*계좌번호 1006-901-483313 우리은행 블레스빈",
-    "",
-    "* 14시 전 입금시 당일출고",
-    "* 입금 확인문자 부탁드립니다",
+    // 카드결제면 계좌번호/입금확인 제거하고 카드결제 안내 추가
+    ...(!isCard ? [
+      "*계좌번호 1006-901-483313 우리은행 블레스빈",
+      "",
+      "* 14시 전 입금시 당일출고",
+      "* 입금 확인문자 부탁드립니다",
+    ] : [
+      "* 카드결제 - 결제링크는 추후 별도 안내드립니다.",
+    ]),
   ].join("\n");
 }
 
 // ── 물류팀 오더방용 텍스트 생성 ─────────────────────────────────────────
-function buildOrderText(items, group, clientName, analysis) {
+function buildOrderText(items, group, clientName, analysis, payMethod="account") {
   const displayName = clientName || analysis.sender_name || "";
   const totalQty    = items.reduce((s,it) => s+it.qty, 0);
   const delivFee    = totalQty < 20 ? DELIVERY_FEE : 0;
   const subtotal    = items.reduce((s,it) => s+getPrice(it.matched,group)*it.qty, 0);
   const total       = subtotal + delivFee;
+  const isCard      = payMethod === "card";
 
   return [
     displayName,
@@ -298,6 +305,8 @@ function buildOrderText(items, group, clientName, analysis) {
     "",
     ...(delivFee > 0 ? [`*배송비 ${delivFee.toLocaleString()}원`] : []),
     `총 금액 ${total.toLocaleString()}원`,
+    // 카드결제면 마지막에 링크요청 추가
+    ...(isCard ? ["", "*카드결제링크요청"] : []),
   ].join("\n");
 }
 
@@ -338,11 +347,13 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
   const subtotal = items.reduce((s,it)=>s+getPrice(it.matched,group)*it.qty,0);
   const total    = subtotal + delivFee;
   const displayName = clientName || analysis.sender_name || "";
-  const plainClient = buildPlainText(analysis, items, group, clientName);
-  const plainOrder  = buildOrderText(items, group, clientName, analysis);
 
-  const [copyTab, setCopyTab] = useState("client"); // "client" | "order"
-  const [copied, setCopied]   = useState(false);
+  const [copyTab,   setCopyTab]   = useState("client");
+  const [copied,    setCopied]    = useState(false);
+  const [payMethod, setPayMethod] = useState("account"); // "account" | "card"
+
+  const plainClient = buildPlainText(analysis, items, group, clientName, payMethod);
+  const plainOrder  = buildOrderText(items, group, clientName, analysis, payMethod);
 
   function handleCopy() {
     const text = copyTab === "client" ? plainClient : plainOrder;
@@ -357,6 +368,19 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontWeight:800, color:"#8b6914", fontSize:13 }}>📄 발주폼</span>
             <span style={{ padding:"2px 9px", borderRadius:10, fontSize:11, fontWeight:700, background:G.bg, color:G.color }}>{G.label}</span>
+          </div>
+          {/* 결제방식 토글 */}
+          <div style={{ display:"flex", gap:4 }}>
+            <button onClick={()=>{ setPayMethod("account"); setCopied(false); }} style={{
+              padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
+              background: payMethod==="account" ? "#059669" : "#e8e0cc",
+              color: payMethod==="account" ? "#fff" : "#6b5b3a",
+            }}>💳 계좌이체</button>
+            <button onClick={()=>{ setPayMethod("card"); setCopied(false); }} style={{
+              padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
+              background: payMethod==="card" ? "#2563eb" : "#e8e0cc",
+              color: payMethod==="card" ? "#fff" : "#6b5b3a",
+            }}>🃏 카드결제</button>
           </div>
         </div>
         {/* 복사 탭 선택 */}
@@ -408,12 +432,20 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
               : totalQty>=20 ? <div style={{ fontSize:13, color:"#059669", marginBottom:6 }}>✓ 배송비 무료 ({totalQty}kg)</div> : null
             }
             <div style={{ fontSize:18, fontWeight:900, color:"#8b6914", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
-            <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
-              *계좌번호 1006-901-483313 우리은행 블레스빈
-            </div>
-            <div style={{ fontSize:12, color:"#6b5b3a", lineHeight:2.2 }}>
-              <div>* 14시 전 입금시 당일출고</div><div>* 입금 확인문자 부탁드립니다</div>
-            </div>
+            {payMethod === "account" ? (
+              <>
+                <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
+                  *계좌번호 1006-901-483313 우리은행 블레스빈
+                </div>
+                <div style={{ fontSize:12, color:"#6b5b3a", lineHeight:2.2 }}>
+                  <div>* 14시 전 입금시 당일출고</div><div>* 입금 확인문자 부탁드립니다</div>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize:12, color:"#2563eb", padding:"8px 12px", borderRadius:8, background:"#eff6ff", border:"1px solid #bfdbfe" }}>
+                * 카드결제 - 결제링크는 추후 별도 안내드립니다.
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -430,6 +462,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
             {"\n"}
             {delivFee > 0 ? `*배송비 ${delivFee.toLocaleString()}원\n` : ""}
             {`총 금액 ${total.toLocaleString()}원`}
+            {payMethod === "card" ? "\n\n*카드결제링크요청" : ""}
           </div>
         </div>
       )}
