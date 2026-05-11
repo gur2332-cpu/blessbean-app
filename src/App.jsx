@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { createClient } from "@supabase/supabase-js";
+
+// ── Supabase 초기화 ───────────────────────────────────────────────────────
+const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
+const DB_ENABLED = !!supabase;
 
 // ── 단가그룹 ──────────────────────────────────────────────────────────────
 const GROUPS = {
@@ -1098,7 +1105,84 @@ export default function App() {
     setStep("result");
   }
 
-  // 발주 확정 시 내역 저장
+  // ── Supabase: 발주 저장 ────────────────────────────────────────────────
+  async function saveToSupabase(ana, its, grp, cName, oNo) {
+    if (!DB_ENABLED) return;
+    try {
+      const totalQty   = its.reduce((s, it) => s + it.qty, 0);
+      const totalPrice = its.reduce((s, it) => s + getPrice(it.matched, grp) * it.qty, 0);
+
+      // orders 테이블에 저장
+      const { data: order, error } = await supabase
+        .from("orders")
+        .insert({
+          client_name: cName || ana.sender_name || "미상",
+          client_id:   selClient?.id || null,
+          group_type:  grp,
+          order_no:    oNo,
+          sms_text:    sms,
+          items:       its.map(it => ({
+            product_id:   it.matched?.id || null,
+            product_name: it.product_name,
+            qty:          it.qty,
+            unit_price:   getPrice(it.matched, grp),
+          })),
+          total_qty:   totalQty,
+          total_price: totalPrice,
+          pay_method:  "account",
+        })
+        .select()
+        .single();
+
+      if (error) { console.error("Supabase 저장 오류:", error); return; }
+
+      // order_items 테이블에 품목 상세 저장 (패턴 분석용)
+      const itemRows = its
+        .filter(it => it.matched)
+        .map(it => ({
+          order_id:     order.id,
+          client_name:  cName || ana.sender_name || "미상",
+          product_id:   it.matched.id,
+          product_name: it.matched.name,
+          qty:          it.qty,
+          unit_price:   getPrice(it.matched, grp),
+          group_type:   grp,
+        }));
+
+      if (itemRows.length > 0) {
+        await supabase.from("order_items").insert(itemRows);
+      }
+    } catch (e) {
+      console.error("Supabase 저장 실패:", e);
+    }
+  }
+
+  // ── Supabase: 거래처 최근 발주 이력 조회 ─────────────────────────────
+  const [clientHistory, setClientHistory] = useState([]); // 거래처별 최근 발주
+  const [clientHistoryLoading, setClientHistoryLoading] = useState(false);
+
+  async function loadClientHistory(cName) {
+    if (!DB_ENABLED || !cName) { setClientHistory([]); return; }
+    setClientHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("id, created_at, order_no, group_type, total_qty, total_price, items, sms_text")
+        .eq("client_name", cName)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      setClientHistory(data || []);
+    } catch (e) {
+      console.error("이력 조회 실패:", e);
+      setClientHistory([]);
+    } finally {
+      setClientHistoryLoading(false);
+    }
+  }
+
+  // 발주 확정 시 내역 저장 (로컬 + Supabase)
   function saveHistory(ana, its, grp, cName) {
     const entry = {
       id: genId(), ts: Date.now(),
@@ -1109,6 +1193,8 @@ export default function App() {
       analysis: ana,
     };
     setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY));
+    // Supabase에도 저장
+    saveToSupabase(ana, its, grp, cName, orderNo);
   }
 
   // 내역에서 불러오기
@@ -1264,7 +1350,11 @@ export default function App() {
                 <h2 style={{ fontSize:21,fontWeight:800,color:"#b8860b",margin:"0 0 5px" }}>발주 문자 분석</h2>
                 <p style={{ fontSize:12,color:"#6b5b3a",margin:"0 0 18px",lineHeight:1.6 }}>거래처 문자를 붙여넣으면 단가그룹에 맞는 발주폼을 자동 생성합니다.</p>
 
-                <ClientSearch clients={clients} selClient={selClient} onSelect={setSelClient} manualGroup={manualGroup} onManualGroup={setManualGroup} />
+                <ClientSearch clients={clients} selClient={selClient} onSelect={c => {
+                  setSelClient(c);
+                  if (c) loadClientHistory(c.name);
+                  else setClientHistory([]);
+                }} manualGroup={manualGroup} onManualGroup={setManualGroup} />
 
                 <label style={S.label}>발신자 번호 (선택)</label>
                 <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" style={{...S.input,marginBottom:12}} />
@@ -1276,8 +1366,68 @@ export default function App() {
                   ✦ 발주 분석 시작
                 </button>
 
+                {/* 거래처 최근 발주 이력 (Supabase) */}
+                {selClient && (
+                  <div style={{ marginTop:16, padding:"14px", borderRadius:13, background:"#fffdf7", border:"1px solid #e0d5b8" }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:"#6b5b3a", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                      <span>📋 {selClient.name} 최근 발주 이력</span>
+                      {!DB_ENABLED && <span style={{ fontSize:10, color:"#dc2626" }}>DB 미연결</span>}
+                      {DB_ENABLED && clientHistoryLoading && <span style={{ fontSize:10, color:"#9a8a6a" }}>조회 중...</span>}
+                    </div>
+                    {!DB_ENABLED ? (
+                      <div style={{ fontSize:12, color:"#9a8a6a" }}>Supabase 연결 후 이력이 여기에 표시됩니다.</div>
+                    ) : clientHistory.length === 0 && !clientHistoryLoading ? (
+                      <div style={{ fontSize:12, color:"#9a8a6a" }}>아직 발주 이력이 없습니다.</div>
+                    ) : (
+                      <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
+                        {clientHistory.map((h, i) => {
+                          const g = GROUPS[h.group_type] || GROUPS.SPECIAL;
+                          const hItems = (h.items || []);
+                          const d = new Date(h.created_at);
+                          const dateStr = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+                          return (
+                            <div key={h.id} style={{ borderRadius:9, border:`1px solid ${g.color}33`, background:g.bg, overflow:"hidden" }}>
+                              <div style={{ padding:"9px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                                <div style={{ fontSize:11, color:g.color, fontWeight:700 }}>{dateStr} · {g.label}</div>
+                                <div style={{ display:"flex", gap:6 }}>
+                                  <span style={{ fontSize:11, color:"#6b5b3a" }}>총 {(h.total_qty||0)}kg · {(h.total_price||0).toLocaleString()}원</span>
+                                  {/* 이전 발주 그대로 불러오기 버튼 */}
+                                  <button onClick={() => {
+                                    // 이전 발주 품목을 items에 채워줌
+                                    const loadedItems = hItems.map(it => {
+                                      const matched = it.product_id ? priceList.find(p => p.id === it.product_id) || null : null;
+                                      return { product_name: it.product_name || matched?.name || "", qty: it.qty || 0, matched };
+                                    });
+                                    setOrderState({ items: loadedItems, ambiguous: [] });
+                                    setAna({ sender_name: selClient.name, summary: `${selClient.name} 이전 발주 불러옴`, intent:"발주요청", urgent:false, special_request:null, items:[], ambiguous:[] });
+                                    setSms(h.sms_text || "");
+                                    setStep("result");
+                                    setMode("form");
+                                  }} style={{
+                                    padding:"2px 8px", borderRadius:6, border:"none",
+                                    background:"#b8860b", color:"#fff", fontSize:10,
+                                    cursor:"pointer", fontWeight:700, whiteSpace:"nowrap"
+                                  }}>불러오기</button>
+                                </div>
+                              </div>
+                              <div style={{ padding:"0 12px 9px", fontSize:11, color:"#4a3820" }}>
+                                {hItems.slice(0,3).map((it,j) => (
+                                  <span key={j} style={{ marginRight:8 }}>
+                                    {it.product_name?.split(" ").slice(0,4).join(" ")} {it.qty}kg
+                                  </span>
+                                ))}
+                                {hItems.length > 3 && <span style={{ color:"#9a8a6a" }}>외 {hItems.length-3}건</span>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* 최근 발주 내역 */}
-                <div style={{ marginTop:24 }}>
+                <div style={{ marginTop:16 }}>
                   <div style={{ fontSize:11,color:"#6b5b3a",fontWeight:700,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                     <span>🕘 최근 발주 내역</span>
                     <span style={{ fontSize:10,color:"#9a8a6a" }}>{history.length}/{MAX_HISTORY}</span>
