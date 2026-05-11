@@ -132,31 +132,41 @@ function buildOriginIndex(priceList) {
   return index;
 }
 
-// 키워드에서 제외할 단어 — 가공방식/일반단어 (너무 흔해서 오매칭 유발)
-const EXCLUDED_KEYWORDS = new Set([
-  "워시드","내추럴","허니","펄프드","무산소","더블","퍼멘테이션","anaerobic",
-  "washed","natural","honey","pulped",
-  "sc17","sc18","sc17/18","ny2","ny3",
-  "프리미엄","스페셜","하이엔드","coe",
-  "마이크로랏","싱글오리진","블렌드",
-  "커피","원두","생두","주문","발주","발송","부탁","안녕","담당","드립니다","kg","5kg","10kg",
+// ── 파서 상수 ─────────────────────────────────────────────────────────────
+const PARSE_SKIP_WORDS = new Set([
+  "et","br","co","gt","cr","hn","pa","pe","ke","tn","ug","rw","ye","vn","id","in","sv","jm","mx",
+  "에티오피아","콜롬비아","브라질","케냐","파나마","코스타리카","온두라스",
+  "과테말라","탄자니아","인도","인도네시아","베트남","르완다","예멘","우간다","엘살바도르","자메이카","멕시코","페루",
+  "워시드","내추럴","허니","펄프드","무산소","더블","퍼멘테이션","washed","natural","honey","pulped","anaerobic",
+  "마이크로랏","싱글오리진","블렌드","스위스워터","마운틴워터","시그니쳐","디카페인",
+  "커피","원두","생두","주문","발주","발송","부탁","안녕","담당자",
+  "드립니다","주세요","부탁드려요","입니다","합니다","드려요","이요","감사합니다",
+  "금일","오늘","내일","당일","긴급","빨리",
+  "kg","킬로","키로","킬로그램",
+  "님","선생님",
 ]);
 
-// 약한 키워드 — 제외하지는 않지만 후보 좁히기 가중치 3배 적용
-const WEAK_KEYWORDS = new Set(["g1","g2","g3","g4","g5","ep","shb","shg","aa","ab","pb","peaberry"]);
+function getSegWords(seg) {
+  return [...new Set(
+    seg.toLowerCase().split(/[\s\/\-\+]+/)
+      .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+(\.\d+)?$/.test(w))
+  )];
+}
+
+function getProductNameWords(p) {
+  return [...new Set(
+    p.name.toLowerCase().split(/[\s\/\-\[\]]+/)
+      .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+(\.\d+)?$/.test(w))
+  )];
+}
 
 // ── 파서 ─────────────────────────────────────────────────────────────────
 function parseLocally(message, priceList) {
   const items      = [];
   const ambiguous  = [];
   const matchedIds = new Set();
-  const originIndex = buildOriginIndex(priceList);
-
-  // 줄바꿈 기준으로 먼저 쪼개고, 각 줄에서 쉼표/이랑/하고로 추가 분절
+  // 수량 전용 줄을 이전 줄에 병합 ("5kg", "5" 등)
   const rawLines = message.split(/\n/);
-
-  // "수량만 있는 줄" 처리: 이전 품목 세그먼트에 수량을 붙임
-  // 예: ["에티오피아 아리차 에이미 워시드", "5kg"] → ["에티오피아 아리차 에이미 워시드 5kg"]
   const mergedLines = [];
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i].trim();
@@ -168,114 +178,45 @@ function parseLocally(message, priceList) {
     }
   }
 
-  // 세그먼트 분절
+  // 세그먼트 분절 (줄바꿈은 이미 처리, 쉼표/이랑/하고/그리고)
   const segments = mergedLines
     .flatMap(l => l.split(/[,，]|이랑|하고|그리고/))
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
-  // 키워드 목록 생성 — 제외 단어 필터링
-  const allKws = [];
-  for (const p of priceList) {
-    const baseKws = [...(p.keywords || []), p.name];
-    const nameWords = p.name.split(/\s+/).filter(w => w.length >= 2);
-    const all = [...new Set([...baseKws, ...nameWords])];
-    for (const kw of all) {
-      const kwLower = kw.toLowerCase();
-      // 제외 단어 스킵
-      if (EXCLUDED_KEYWORDS.has(kwLower)) continue;
-      allKws.push({ kw: kwLower, product: p });
-    }
-  }
-  allKws.sort((a, b) => b.kw.length - a.kw.length);
-
   for (const seg of segments) {
-    const segLower = seg.toLowerCase();
-    const segUsedIds = new Set();
-    const segProcessedKws = new Set();
+    const segWords = getSegWords(seg);
+    if (segWords.length === 0) continue;
 
-    // ── 1단계: 품목 키워드 매칭 ─────────────────────────────────────────
-    for (const { kw, product } of allKws) {
-      if (matchedIds.has(product.id)) continue;
-      if (segUsedIds.has(product.id)) continue;
+    const scored = priceList
+      .filter(p => !matchedIds.has(p.id))
+      .map(p => {
+        const pw = getProductNameWords(p);
+        const overlap = segWords.filter(sw => pw.includes(sw));
+        return { p, score: overlap.length };
+      })
+      .filter(s => s.score > 0)
+      .sort((a, b) => b.score - a.score);
 
-      const idx = segLower.indexOf(kw);
-      if (idx === -1) continue;
-      if (Object.keys(originIndex).some(ok => ok === kw)) continue;
-      if (segProcessedKws.has(kw)) continue;
+    if (scored.length === 0) continue;
 
-      // 이 키워드를 공유하는 모든 미매칭 품목
-      const allMatching = priceList.filter(p =>
-        !matchedIds.has(p.id) && !segUsedIds.has(p.id) &&
-        [...(p.keywords || []), p.name, ...p.name.split(/\s+/).filter(w => w.length >= 2)]
-          .some(k => k.toLowerCase() === kw)
-      );
-      if (allMatching.length === 0) continue;
-      segProcessedKws.add(kw);
+    const maxScore = scored[0].score;
+    const top = scored.filter(s => s.score === maxScore).map(s => s.p);
 
-      let candidates = allMatching;
+    // 수량 추출: kg/킬로 단위가 붙은 숫자 우선, 없으면 독립된 숫자(앞에 문자 없는 것)
+    const qtyWithUnit = seg.match(/(?<![a-zA-Z])(\d+(?:\.\d+)?)\s*(?:kg|킬로그램|킬로|키로)\b/i);
+    const qtyBare     = seg.match(/(?<![a-zA-Z\d])(\d+(?:\.\d+)?)(?!\s*[a-zA-Z])/);
+    const qty = qtyWithUnit ? parseFloat(qtyWithUnit[1]) : qtyBare ? parseFloat(qtyBare[1]) : 0;
 
-      // ★ 핵심: 후보가 여럿이면 세그먼트의 다른 단어로 추가 필터링
-      if (candidates.length > 1) {
-        const segWords = segLower.split(/\s+/).filter(w => w.length >= 2 && !EXCLUDED_KEYWORDS.has(w));
-        const scored = candidates.map(p => {
-          const pWords = p.name.toLowerCase().split(/\s+/);
-          let score = 0;
-          for (const sw of segWords) {
-            if (pWords.some(pw => pw === sw || pw.includes(sw) || sw.includes(pw))) {
-              score += WEAK_KEYWORDS.has(sw) ? 3 : 1;
-            }
-          }
-          return { p, score };
-        });
-        const maxScore = Math.max(...scored.map(s => s.score));
-        const top = scored.filter(s => s.score === maxScore).map(s => s.p);
-        if (top.length < candidates.length) candidates = top;
-      }
-
-      const qty = extractQty(seg, idx, idx + kw.length);
-
-      if (candidates.length === 1) {
-        const p = candidates[0];
-        items.push({ product_id: p.id, product_name: p.name, quantity: qty, unit: "kg" });
-        matchedIds.add(p.id);
-        segUsedIds.add(p.id);
-      } else {
-        ambiguous.push({
-          keyword: kw, qty, segment: seg,
-          candidates: candidates.map(p => ({ id: p.id, name: p.name })),
-        });
-        candidates.forEach(p => segUsedIds.add(p.id));
-      }
-    }
-
-    // ── 2단계: 원산지만 감지된 경우 ─────────────────────────────────────
-    if (segUsedIds.size === 0) {
-      const originMatches = [];
-      for (const [originKw, productIdSet] of Object.entries(originIndex)) {
-        const idx = segLower.indexOf(originKw);
-        if (idx === -1) continue;
-        const cands = [...productIdSet]
-          .filter(id => !matchedIds.has(id))
-          .map(id => priceList.find(p => p.id === id))
-          .filter(Boolean);
-        if (cands.length > 0) originMatches.push({ originKw, idx, cands });
-      }
-      if (originMatches.length > 0) {
-        originMatches.sort((a, b) => b.originKw.length - a.originKw.length);
-        const best = originMatches[0];
-        const qty = extractQty(seg, best.idx, best.idx + best.originKw.length);
-        if (best.cands.length === 1) {
-          const p = best.cands[0];
-          items.push({ product_id: p.id, product_name: p.name, quantity: qty, unit: "kg" });
-          matchedIds.add(p.id);
-        } else {
-          ambiguous.push({
-            keyword: best.originKw, qty, segment: seg,
-            candidates: best.cands.map(p => ({ id: p.id, name: p.name })),
-          });
-        }
-      }
+    if (top.length === 1) {
+      const p = top[0];
+      items.push({ product_id: p.id, product_name: p.name, quantity: qty, unit: "kg" });
+      matchedIds.add(p.id);
+    } else {
+      ambiguous.push({
+        keyword: segWords.join(" "), qty, segment: seg,
+        candidates: top.map(p => ({ id: p.id, name: p.name })),
+      });
     }
   }
 
@@ -355,6 +296,7 @@ function buildOrderText(items, group, clientName, analysis) {
         : `${it.product_name} ${it.qty}kg * 확인필요`;
     }),
     "",
+    ...(delivFee > 0 ? [`*배송비 ${delivFee.toLocaleString()}원`] : []),
     `총 금액 ${total.toLocaleString()}원`,
   ].join("\n");
 }
@@ -486,6 +428,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
               return (p ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원` : `${it.product_name} ${it.qty}kg * 확인필요`);
             }).join("\n")}{"\n"}
             {"\n"}
+            {delivFee > 0 ? `*배송비 ${delivFee.toLocaleString()}원\n` : ""}
             {`총 금액 ${total.toLocaleString()}원`}
           </div>
         </div>
@@ -1104,11 +1047,10 @@ export default function App() {
 
   function mapItems(raw) {
     return (raw||[]).map(it => {
-      const found = priceList.find(p=>
-        (it.product_id&&p.id===it.product_id)||
-        (it.product_name&&p.name.includes(it.product_name.substring(0,5)))
-      );
-      return { product_name:it.product_name, qty:it.quantity||0, matched:found||null };
+      const found = it.product_id
+        ? priceList.find(p => p.id === it.product_id) || null
+        : null;
+      return { product_name: it.product_name, qty: it.quantity||0, matched: found };
     });
   }
 
