@@ -132,115 +132,147 @@ function buildOriginIndex(priceList) {
   return index;
 }
 
+// 키워드에서 제외할 단어 — 가공방식/일반단어 (너무 흔해서 오매칭 유발)
+const EXCLUDED_KEYWORDS = new Set([
+  "워시드","내추럴","허니","펄프드","무산소","더블","퍼멘테이션","anaerobic",
+  "washed","natural","honey","pulped",
+  "sc17","sc18","sc17/18","ny2","ny3",
+  "프리미엄","스페셜","하이엔드","coe",
+  "마이크로랏","싱글오리진","블렌드",
+  "커피","원두","생두","주문","발주","발송","부탁","안녕","담당","드립니다","kg","5kg","10kg",
+]);
+
+// 약한 키워드 — 제외하지는 않지만 후보 좁히기 가중치 3배 적용
+const WEAK_KEYWORDS = new Set(["g1","g2","g3","g4","g5","ep","shb","shg","aa","ab","pb","peaberry"]);
+
 // ── 파서 ─────────────────────────────────────────────────────────────────
-// 핵심: 세그먼트마다 break 없이 끝까지 모든 품목을 탐색
 function parseLocally(message, priceList) {
   const items      = [];
   const ambiguous  = [];
-  const matchedIds = new Set(); // 전체 확정 매칭 id
-
+  const matchedIds = new Set();
   const originIndex = buildOriginIndex(priceList);
 
-  // 문자를 세그먼트로 분절 (줄바꿈, 쉼표, 이랑, 하고, 그리고)
-  const segments = message
-    .split(/[\n,，]|이랑|하고|그리고/)
+  // 줄바꿈 기준으로 먼저 쪼개고, 각 줄에서 쉼표/이랑/하고로 추가 분절
+  const rawLines = message.split(/\n/);
+
+  // "수량만 있는 줄" 처리: 이전 품목 세그먼트에 수량을 붙임
+  // 예: ["에티오피아 아리차 에이미 워시드", "5kg"] → ["에티오피아 아리차 에이미 워시드 5kg"]
+  const mergedLines = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const line = rawLines[i].trim();
+    const isQtyOnly = /^\d+(\.\d+)?\s*(kg|킬로|키로|킬로그램)?$/i.test(line) && line.length <= 8;
+    if (isQtyOnly && mergedLines.length > 0) {
+      mergedLines[mergedLines.length - 1] += " " + line;
+    } else {
+      mergedLines.push(line);
+    }
+  }
+
+  // 세그먼트 분절
+  const segments = mergedLines
+    .flatMap(l => l.split(/[,，]|이랑|하고|그리고/))
     .map(s => s.trim())
     .filter(s => s.length > 0);
 
-  // 키워드 목록 — 긴 것 우선 (한 번만 생성)
-  // 품목명의 모든 단어(2글자 이상)를 키워드로 추가해서 부분 검색 지원
+  // 키워드 목록 생성 — 제외 단어 필터링
   const allKws = [];
   for (const p of priceList) {
     const baseKws = [...(p.keywords || []), p.name];
-    // 품목명을 단어 단위로 분해해서 추가 키워드 생성
-    // 예: "BR 미나스 제라이스 세하도 프리미엄" → ["BR","미나스","제라이스","세하도","프리미엄"]
     const nameWords = p.name.split(/\s+/).filter(w => w.length >= 2);
-    const allForProduct = [...new Set([...baseKws, ...nameWords])];
-    for (const kw of allForProduct) {
-      allKws.push({ kw: kw.toLowerCase(), product: p });
+    const all = [...new Set([...baseKws, ...nameWords])];
+    for (const kw of all) {
+      const kwLower = kw.toLowerCase();
+      // 제외 단어 스킵
+      if (EXCLUDED_KEYWORDS.has(kwLower)) continue;
+      allKws.push({ kw: kwLower, product: p });
     }
   }
   allKws.sort((a, b) => b.kw.length - a.kw.length);
 
   for (const seg of segments) {
     const segLower = seg.toLowerCase();
-    const segUsedIds = new Set(); // 이 세그먼트에서 처리한 id (중복 방지)
-
-    // ── 1단계: 구체적 품목 키워드 매칭 ──────────────────────────────────
-    // break 없이 루프 끝까지 돌며 모든 매칭 수집
-    // 이미 이번 세그먼트에서 처리한 (keyword, productSet) 조합 추적
+    const segUsedIds = new Set();
     const segProcessedKws = new Set();
 
+    // ── 1단계: 품목 키워드 매칭 ─────────────────────────────────────────
     for (const { kw, product } of allKws) {
       if (matchedIds.has(product.id)) continue;
       if (segUsedIds.has(product.id)) continue;
 
       const idx = segLower.indexOf(kw);
       if (idx === -1) continue;
-
-      // 순수 국가코드/원산지 키워드는 2단계에서 처리
       if (Object.keys(originIndex).some(ok => ok === kw)) continue;
-
-      // 이 키워드로 이미 처리했으면 스킵 (다른 품목의 동일 키워드 중복 방지)
       if (segProcessedKws.has(kw)) continue;
 
-      // 이 키워드가 포함된 모든 미매칭 품목 수집
+      // 이 키워드를 공유하는 모든 미매칭 품목
       const allMatching = priceList.filter(p =>
-        !matchedIds.has(p.id) &&
-        !segUsedIds.has(p.id) &&
+        !matchedIds.has(p.id) && !segUsedIds.has(p.id) &&
         [...(p.keywords || []), p.name, ...p.name.split(/\s+/).filter(w => w.length >= 2)]
           .some(k => k.toLowerCase() === kw)
       );
-
-      // 이 키워드로 매칭되는 품목이 없으면 스킵
       if (allMatching.length === 0) continue;
-
       segProcessedKws.add(kw);
+
+      let candidates = allMatching;
+
+      // ★ 핵심: 후보가 여럿이면 세그먼트의 다른 단어로 추가 필터링
+      if (candidates.length > 1) {
+        const segWords = segLower.split(/\s+/).filter(w => w.length >= 2 && !EXCLUDED_KEYWORDS.has(w));
+        const scored = candidates.map(p => {
+          const pWords = p.name.toLowerCase().split(/\s+/);
+          let score = 0;
+          for (const sw of segWords) {
+            if (pWords.some(pw => pw === sw || pw.includes(sw) || sw.includes(pw))) {
+              score += WEAK_KEYWORDS.has(sw) ? 3 : 1;
+            }
+          }
+          return { p, score };
+        });
+        const maxScore = Math.max(...scored.map(s => s.score));
+        const top = scored.filter(s => s.score === maxScore).map(s => s.p);
+        if (top.length < candidates.length) candidates = top;
+      }
+
       const qty = extractQty(seg, idx, idx + kw.length);
 
-      if (allMatching.length === 1) {
-        // 단독 확정 매칭
-        const p = allMatching[0];
+      if (candidates.length === 1) {
+        const p = candidates[0];
         items.push({ product_id: p.id, product_name: p.name, quantity: qty, unit: "kg" });
         matchedIds.add(p.id);
         segUsedIds.add(p.id);
       } else {
-        // 여러 품목 → ambiguous (사용자 선택)
         ambiguous.push({
           keyword: kw, qty, segment: seg,
-          candidates: allMatching.map(p => ({ id: p.id, name: p.name })),
+          candidates: candidates.map(p => ({ id: p.id, name: p.name })),
         });
-        allMatching.forEach(p => segUsedIds.add(p.id));
+        candidates.forEach(p => segUsedIds.add(p.id));
       }
-      // break 없음 — 계속 탐색
     }
 
-    // ── 2단계: 1단계에서 아무것도 안 잡혔을 때만 원산지 매칭 ──────────
+    // ── 2단계: 원산지만 감지된 경우 ─────────────────────────────────────
     if (segUsedIds.size === 0) {
       const originMatches = [];
       for (const [originKw, productIdSet] of Object.entries(originIndex)) {
         const idx = segLower.indexOf(originKw);
         if (idx === -1) continue;
-        const candidates = [...productIdSet]
+        const cands = [...productIdSet]
           .filter(id => !matchedIds.has(id))
           .map(id => priceList.find(p => p.id === id))
           .filter(Boolean);
-        if (candidates.length > 0) {
-          originMatches.push({ originKw, idx, candidates });
-        }
+        if (cands.length > 0) originMatches.push({ originKw, idx, cands });
       }
       if (originMatches.length > 0) {
         originMatches.sort((a, b) => b.originKw.length - a.originKw.length);
         const best = originMatches[0];
         const qty = extractQty(seg, best.idx, best.idx + best.originKw.length);
-        if (best.candidates.length === 1) {
-          const p = best.candidates[0];
+        if (best.cands.length === 1) {
+          const p = best.cands[0];
           items.push({ product_id: p.id, product_name: p.name, quantity: qty, unit: "kg" });
           matchedIds.add(p.id);
         } else {
           ambiguous.push({
             keyword: best.originKw, qty, segment: seg,
-            candidates: best.candidates.map(p => ({ id: p.id, name: p.name })),
+            candidates: best.cands.map(p => ({ id: p.id, name: p.name })),
           });
         }
       }
@@ -259,7 +291,7 @@ function parseLocally(message, priceList) {
   const urgent = /급|긴급|빨리|당일/i.test(message);
   const allNames = [
     ...items.map(it => `${it.product_name} ${it.quantity}kg`),
-    ...ambiguous.map(a => `${a.keyword} ${a.qty > 0 ? a.qty + "kg" : "?kg"} (품목 선택 필요)`),
+    ...ambiguous.map(a => `${a.keyword} ${a.qty > 0 ? a.qty+"kg" : "?kg"} (품목 선택 필요)`),
   ].join(", ");
 
   return {
@@ -827,6 +859,82 @@ function parseStockExcel(rows) {
   return result;
 }
 
+// ── 품목 검색 자동완성 컴포넌트 ──────────────────────────────────────────
+function ProductSearch({ priceList, selected, group, onSelect, placeholder="품목 검색..." }) {
+  const [query, setQuery]     = useState(selected?.name || "");
+  const [focused, setFocused] = useState(false);
+
+  // 외부에서 selected 바뀌면 동기화
+  useEffect(() => { setQuery(selected?.name || ""); }, [selected?.id]);
+
+  const G = GROUPS[group] || GROUPS.SPECIAL;
+
+  const suggestions = query.trim().length > 0
+    ? priceList.filter(p => {
+        const q = query.toLowerCase();
+        return p.name.toLowerCase().includes(q) ||
+               (p.origin && p.origin.toLowerCase().includes(q)) ||
+               p.name.split(" ").some(w => w.toLowerCase().startsWith(q));
+      }).slice(0, 20)
+    : [];
+
+  function handleSelect(p) {
+    onSelect(p);
+    setQuery(p.name);
+    setFocused(false);
+  }
+
+  return (
+    <div style={{ position:"relative" }}>
+      <input
+        value={query}
+        onChange={e => { setQuery(e.target.value); if (selected && e.target.value !== selected.name) onSelect(null); }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 180)}
+        placeholder={placeholder}
+        style={{
+          width:"100%", padding:"8px 10px", borderRadius:8, boxSizing:"border-box",
+          background:"#fff", border:`1px solid ${selected ? G.color+"88" : "#d4c49a"}`,
+          color:"#1a1208", fontSize:12, outline:"none",
+        }}
+      />
+
+      {/* 드롭다운 */}
+      {focused && query.trim().length > 0 && (
+        <div style={{
+          position:"absolute", top:"calc(100% + 3px)", left:0, right:0, zIndex:300,
+          background:"#fffdf7", border:"1px solid #d4c49a", borderRadius:10,
+          boxShadow:"0 6px 20px rgba(0,0,0,0.12)", maxHeight:240, overflowY:"auto",
+        }}>
+          {suggestions.length === 0 ? (
+            <div style={{ padding:"12px 14px", fontSize:12, color:"#9a8a6a" }}>
+              일치하는 품목 없음
+            </div>
+          ) : suggestions.map(p => {
+            const pr = getPrice(p, group);
+            return (
+              <div key={p.id} onMouseDown={() => handleSelect(p)} style={{
+                padding:"10px 14px", cursor:"pointer",
+                borderBottom:"1px solid #f0ead8",
+                background: selected?.id === p.id ? G.bg : "transparent",
+              }}
+                onMouseOver={e => e.currentTarget.style.background = G.bg}
+                onMouseOut={e => e.currentTarget.style.background = selected?.id===p.id ? G.bg : "transparent"}
+              >
+                <div style={{ fontSize:12, fontWeight:600, color:"#1a1208" }}>{p.name}</div>
+                <div style={{ fontSize:11, color:G.color, fontWeight:700, marginTop:2 }}>
+                  {G.label} {pr.toLocaleString()}원/kg
+                  {p.stock > 0 && <span style={{ color:"#9a8a6a", fontWeight:400, marginLeft:8 }}>재고 {p.stock}kg</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── 업로드 탭 ─────────────────────────────────────────────────────────────
 function UploadTab({ onPriceList, onClients, onStockMap }) {
   const [status, setStatus]     = useState({ prices:null, clients:null, stock:null });
@@ -1344,62 +1452,29 @@ export default function App() {
                 {mode==="edit" && (
                   <div>
                     {items.map((it,i)=>{ const p=it.matched; const pr=getPrice(p,activeGroup); const sub=pr*it.qty;
-                      // 같은 나라 품목 필터 (품목 변경 드롭다운용)
-                      const sameOriginItems = p
-                        ? priceList.filter(x => {
-                            const pCode = inferCountryCode(p);
-                            const xCode = inferCountryCode(x);
-                            return pCode && xCode && pCode === xCode;
-                          })
-                        : priceList;
                       return (
-                      <div key={i} style={{ borderRadius:11,border:`1px solid ${p?"rgba(212,175,55,0.2)":"rgba(255,120,80,0.25)"}`,background:p?"rgba(212,175,55,0.03)":"rgba(255,120,80,0.04)",padding:"13px",marginBottom:9 }}>
+                      <div key={i} style={{ borderRadius:11,border:`1px solid ${p?"#e0d5b8":"rgba(255,120,80,0.25)"}`,background:p?"#fffdf7":"rgba(255,120,80,0.03)",padding:"13px",marginBottom:9 }}>
                         <div style={{ display:"flex",justifyContent:"space-between",marginBottom:9 }}>
                           <div style={{ flex:1 }}>
-                            {p ? (
-                              <div>
-                                {/* 품목명 + 변경 드롭다운 */}
-                                <div style={{ fontWeight:700,fontSize:13,color:"#1a1208",marginBottom:5 }}>{p.name}</div>
-                                <div style={{ fontSize:10,color:"#9a8a6a",marginBottom:7,display:"flex",gap:8 }}>
-                                  <span style={{ color:G.color,fontWeight:600 }}>{G.label} {pr.toLocaleString()}원/kg</span>
-                                  {p.stock > 0 && <span>재고 {p.stock}kg</span>}
-                                </div>
-                                {/* 품목 변경 드롭다운 */}
-                                <select
-                                  value={p.id}
-                                  onChange={e => {
-                                    const prod = priceList.find(x => x.id === e.target.value);
-                                    setItems(prev => prev.map((x,j) => j===i ? {...x, matched:prod||null, product_name:prod?.name||x.product_name} : x));
-                                  }}
-                                  style={{ width:"100%",padding:"6px 10px",borderRadius:8,background:"#f9f6ef",border:`1px solid ${G.color}44`,color:"#4a3820",fontSize:12,outline:"none",cursor:"pointer" }}
-                                >
-                                  {/* 같은 나라 품목 먼저 */}
-                                  {sameOriginItems.length > 0 && (
-                                    <optgroup label="── 같은 원산지 품목 ──">
-                                      {sameOriginItems.map(pp => (
-                                        <option key={pp.id} value={pp.id}>
-                                          {pp.name} ({pp.prices[activeGroup].toLocaleString()}원/kg)
-                                        </option>
-                                      ))}
-                                    </optgroup>
-                                  )}
-                                  {/* 나머지 전체 품목 */}
-                                  <optgroup label="── 전체 품목 ──">
-                                    {priceList.filter(x => !sameOriginItems.find(s=>s.id===x.id)).map(pp => (
-                                      <option key={pp.id} value={pp.id}>
-                                        {pp.name} ({pp.prices[activeGroup].toLocaleString()}원/kg)
-                                      </option>
-                                    ))}
-                                  </optgroup>
-                                </select>
+                            {/* 품목 검색 자동완성 — 매칭 여부 관계없이 항상 표시 */}
+                            {p && (
+                              <div style={{ fontSize:11,color:"#9a8a6a",marginBottom:4,display:"flex",gap:8 }}>
+                                <span style={{ color:G.color,fontWeight:700 }}>{G.label} {pr.toLocaleString()}원/kg</span>
+                                {p.stock > 0 && <span>재고 {p.stock}kg</span>}
                               </div>
-                            ) : (
-                              <select onChange={e=>{ const prod=priceList.find(x=>x.id===e.target.value); setItems(prev=>prev.map((x,j)=>j===i?{...x,matched:prod||null,product_name:prod?.name||x.product_name}:x)); }} value=""
-                                style={{ padding:"7px 10px",borderRadius:7,background:"rgba(0,0,0,0.03)",border:"1px solid rgba(255,120,80,0.4)",color:"#1a1208",fontSize:12,width:"100%" }}>
-                                <option value="">⚠️ 상품 선택 ({it.product_name})</option>
-                                {priceList.map(pp=><option key={pp.id} value={pp.id}>{pp.name} ({pp.prices[activeGroup].toLocaleString()}원/kg)</option>)}
-                              </select>
                             )}
+                            {!p && (
+                              <div style={{ fontSize:11,color:"#dc2626",marginBottom:4 }}>
+                                ⚠ 품목 미매칭 — 아래에서 검색하세요
+                              </div>
+                            )}
+                            <ProductSearch
+                              priceList={priceList}
+                              selected={p || null}
+                              group={activeGroup}
+                              onSelect={prod => setItems(prev => prev.map((x,j) => j===i ? {...x, matched:prod||null, product_name:prod?.name||x.product_name} : x))}
+                              placeholder={p ? "품목 변경 검색..." : `품목 검색 (원래: ${it.product_name})`}
+                            />
                           </div>
                           <button onClick={()=>setItems(prev=>prev.filter((_,j)=>j!==i))} style={{ padding:"3px 8px",borderRadius:6,border:"1px solid rgba(255,80,80,0.25)",background:"transparent",color:"#ff6b6b",fontSize:10,cursor:"pointer",marginLeft:9,alignSelf:"flex-start" }}>삭제</button>
                         </div>
@@ -1407,9 +1482,9 @@ export default function App() {
                           <div style={{ display:"flex",alignItems:"center",gap:7 }}>
                             <span style={{ fontSize:11,color:"#6b5b3a" }}>수량(kg)</span>
                             <input type="number" min={0} value={it.qty} onChange={e=>setItems(prev=>prev.map((x,j)=>j===i?{...x,qty:Number(e.target.value)}:x))}
-                              style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"rgba(0,0,0,0.03)",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
+                              style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#f5f0e8",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
                           </div>
-                          {p&&<span style={{ fontWeight:800,fontSize:14,color:G.color }}>{sub.toLocaleString()}원</span>}
+                          {p && <span style={{ fontWeight:800,fontSize:14,color:G.color }}>{sub.toLocaleString()}원</span>}
                         </div>
                       </div>
                     );})}
