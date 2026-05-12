@@ -607,7 +607,7 @@ function PriceEditModal({ product, onClose, onSave }) {
 }
 
 // ── 최근 발주 내역 카드 ───────────────────────────────────────────────────
-function HistoryList({ history, onLoad }) {
+function HistoryList({ history, onLoad, onDelete }) {
   if (history.length === 0) return (
     <div style={{ padding:"20px", textAlign:"center", color:"#9a8a6a", fontSize:12, background:"rgba(0,0,0,0.02)", borderRadius:12, border:"1px dashed #f9f6ef" }}>
       아직 발주 내역이 없습니다
@@ -616,33 +616,47 @@ function HistoryList({ history, onLoad }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
       {history.map((h, i) => {
-        const g = GROUPS[h.group];
+        const g = GROUPS[h.group] || GROUPS.SPECIAL;
         const totalQty = (h.items||[]).reduce((s,it)=>s+it.qty,0);
         return (
-          <button key={h.id} onClick={()=>onLoad(h)} style={{
-            display:"block", width:"100%", textAlign:"left",
-            padding:"11px 13px", borderRadius:11,
-            background:"rgba(0,0,0,0.02)", border:`1px solid ${g.color}33`,
-            cursor:"pointer", transition:"background 0.12s",
-          }}
-            onMouseOver={e=>e.currentTarget.style.background=g.bg}
-            onMouseOut={e=>e.currentTarget.style.background="rgba(0,0,0,0.02)"}
-          >
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:"#1a1208" }}>
-                  {h.clientName || h.senderName || "발신자 미상"}
-                </span>
-                <span style={{ padding:"1px 7px", borderRadius:7, fontSize:10, fontWeight:700, background:g.bg, color:g.color }}>{g.label}</span>
+          <div key={h.id} style={{
+            display:"flex", alignItems:"stretch",
+            borderRadius:11, border:`1px solid ${g.color}33`, overflow:"hidden",
+            background:"#fffdf7",
+          }}>
+            {/* 클릭 영역 */}
+            <button onClick={()=>onLoad(h)} style={{
+              flex:1, textAlign:"left", padding:"11px 13px",
+              background:"transparent", border:"none", cursor:"pointer",
+            }}
+              onMouseOver={e=>e.currentTarget.style.background=g.bg}
+              onMouseOut={e=>e.currentTarget.style.background="transparent"}
+            >
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:"#1a1208" }}>
+                    {h.clientName || h.senderName || "발신자 미상"}
+                  </span>
+                  <span style={{ padding:"1px 7px", borderRadius:7, fontSize:10, fontWeight:700, background:g.bg, color:g.color }}>{g.label}</span>
+                </div>
+                <span style={{ fontSize:10, color:"#9a8a6a" }}>{fmtDate(h.ts)}</span>
               </div>
-              <span style={{ fontSize:10, color:"#9a8a6a" }}>{fmtDate(h.ts)}</span>
-            </div>
-            <div style={{ fontSize:11, color:"#6b5b3a" }}>
-              {(h.items||[]).slice(0,3).map(it=>it.product_name||it.matched?.name).filter(Boolean).join(" · ")}
-              {(h.items||[]).length > 3 && ` 외 ${h.items.length-3}건`}
-              {totalQty > 0 && <span style={{ marginLeft:8, color:"#9a8a6a" }}>{totalQty}kg</span>}
-            </div>
-          </button>
+              <div style={{ fontSize:11, color:"#6b5b3a" }}>
+                {(h.items||[]).slice(0,3).map(it=>it.product_name||it.matched?.name).filter(Boolean).join(" · ")}
+                {(h.items||[]).length > 3 && ` 외 ${h.items.length-3}건`}
+                {totalQty > 0 && <span style={{ marginLeft:8, color:"#9a8a6a" }}>{totalQty}kg</span>}
+              </div>
+            </button>
+            {/* 삭제 버튼 */}
+            <button onClick={e=>{ e.stopPropagation(); onDelete(h.id); }} style={{
+              padding:"0 12px", background:"transparent", border:"none",
+              borderLeft:"1px solid #f0ead8", color:"#dc2626", fontSize:14,
+              cursor:"pointer", flexShrink:0,
+            }}
+              onMouseOver={e=>e.currentTarget.style.background="#fef2f2"}
+              onMouseOut={e=>e.currentTarget.style.background="transparent"}
+            >✕</button>
+          </div>
         );
       })}
     </div>
@@ -1088,6 +1102,7 @@ export default function App() {
   const [selClient, setSelClient]   = useState(null);
   const [manualGroup, setManualGroup] = useState("SPECIAL");
   const [copyDone, setCopyDone]     = useState(false);
+  const [confirmed, setConfirmed]   = useState(false); // 발주 확정 여부
 
   // 모달
   const [clientModal, setClientModal] = useState(null);
@@ -1217,7 +1232,12 @@ export default function App() {
     }
   }
 
-  // 발주 확정 시 내역 저장 (로컬 + Supabase)
+  // 내역 삭제
+  function deleteHistory(id) {
+    setHistory(prev => prev.filter(h => h.id !== id));
+  }
+
+  // 발주 확정 시 내역 저장 (로컬 + Supabase) + 입력 화면 초기화
   function saveHistory(ana, its, grp, cName) {
     const entry = {
       id: genId(), ts: Date.now(),
@@ -1228,8 +1248,9 @@ export default function App() {
       analysis: ana,
     };
     setHistory(prev => [entry, ...prev].slice(0, MAX_HISTORY));
-    // Supabase에도 저장
     saveToSupabase(ana, its, grp, cName, orderNo);
+    // 확정 후 입력 필드 초기화 (거래처명, 문자내용)
+    setConfirmed(true);
   }
 
   // 내역에서 불러오기
@@ -1391,9 +1412,6 @@ export default function App() {
                   else setClientHistory([]);
                 }} manualGroup={manualGroup} onManualGroup={setManualGroup} />
 
-                <label style={S.label}>발신자 번호 (선택)</label>
-                <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" style={{...S.input,marginBottom:12}} />
-
                 <label style={S.label}>문자 내용 *</label>
                 <textarea value={sms} onChange={e=>setSms(e.target.value)} placeholder="거래처에서 받은 문자를 그대로 붙여넣으세요…" rows={6} style={S.textarea} />
 
@@ -1467,7 +1485,7 @@ export default function App() {
                     <span>🕘 최근 발주 내역</span>
                     <span style={{ fontSize:10,color:"#9a8a6a" }}>{history.length}/{MAX_HISTORY}</span>
                   </div>
-                  <HistoryList history={history} onLoad={loadHistory} />
+                  <HistoryList history={history} onLoad={loadHistory} onDelete={deleteHistory} />
                 </div>
               </div>
             )}
@@ -1678,7 +1696,20 @@ export default function App() {
                     </div>
                   )}
                   <div style={{ display:"flex",gap:9 }}>
-                    <button onClick={()=>{ setStep("input");setAna(null);setOrderState({items:[],ambiguous:[]});setMode("form");setOrderNo(genOrderNo()); }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#6b5b3a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
+                    <button onClick={()=>{
+                      setStep("input");
+                      setAna(null);
+                      setOrderState({items:[],ambiguous:[]});
+                      setMode("form");
+                      setOrderNo(genOrderNo());
+                      // 확정 후 돌아왔을 때만 거래처/문자 초기화
+                      if (confirmed) {
+                        setSelClient(null);
+                        setSms("");
+                        setClientHistory([]);
+                        setConfirmed(false);
+                      }
+                    }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#6b5b3a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
                     <button onClick={()=>{
                       saveHistory(analysis, items, activeGroup, selClient?.name||null);
                       handleBottomCopy();
