@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { createClient } from "@supabase/supabase-js";
 
-const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
-const DB_ENABLED = !!supabase;
+// /api/db 프록시를 통해 Supabase 접근 (브라우저에서 직접 접근 불필요)
+const DB_ENABLED = true;
+let supabase = null;
 
 // ── 단가그룹 ──────────────────────────────────────────────────────────────
 const GROUPS = {
