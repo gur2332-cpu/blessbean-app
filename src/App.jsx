@@ -1150,61 +1150,52 @@ export default function App() {
       const totalQty   = its.reduce((s, it) => s + it.qty, 0);
       const totalPrice = its.reduce((s, it) => s + getPrice(it.matched, grp) * it.qty, 0);
 
-      const { data: order, error } = await supabase
-        .from("orders")
-        .insert({
-          client_name: cName || ana.sender_name || "미상",
-          client_id:   selClient?.id || null,
-          group_type:  grp,
-          order_no:    oNo,
-          sms_text:    sms,
-          items:       its.map(it => ({
-            product_id:   it.matched?.id || null,
-            product_name: it.product_name,
-            qty:          it.qty,
-            unit_price:   getPrice(it.matched, grp),
-          })),
-          total_qty:   totalQty,
-          total_price: totalPrice,
-          pay_method:  "account",
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_order",
+          payload: {
+            order: {
+              client_name: cName || ana.sender_name || "미상",
+              client_id:   selClient?.id || null,
+              group_type:  grp,
+              order_no:    oNo,
+              sms_text:    sms,
+              items:       its.map(it => ({
+                product_id:   it.matched?.id || null,
+                product_name: it.product_name,
+                qty:          it.qty,
+                unit_price:   getPrice(it.matched, grp),
+              })),
+              total_qty:   totalQty,
+              total_price: totalPrice,
+              pay_method:  "account",
+            },
+            items: its.filter(it => it.matched).map(it => ({
+              client_name:  cName || ana.sender_name || "미상",
+              product_id:   it.matched.id,
+              product_name: it.matched.name,
+              qty:          it.qty,
+              unit_price:   getPrice(it.matched, grp),
+              group_type:   grp,
+            })),
+          }
         })
-        .select()
-        .single();
+      });
 
-      if (error) {
-        // 오류 전체를 화면에 표시 (code + message + hint + details)
-        const errMsg = `code:${error.code} / ${error.message}${error.hint ? " / hint:"+error.hint : ""}`;
-        console.error("Supabase 저장 오류 전체:", JSON.stringify(error));
+      const json = await res.json();
+      if (!res.ok || json.error) {
+        const errMsg = json.error?.message || JSON.stringify(json.error);
         setDbStatus("error:" + errMsg);
         return;
       }
 
-      // order_items 저장
-      const itemRows = its
-        .filter(it => it.matched)
-        .map(it => ({
-          order_id:     order.id,
-          client_name:  cName || ana.sender_name || "미상",
-          product_id:   it.matched.id,
-          product_name: it.matched.name,
-          qty:          it.qty,
-          unit_price:   getPrice(it.matched, grp),
-          group_type:   grp,
-        }));
-
-      if (itemRows.length > 0) {
-        const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
-        if (itemErr) console.error("order_items 저장 오류:", itemErr.message);
-      }
-
       setDbStatus("saved");
       setTimeout(() => setDbStatus(null), 3000);
-
-      // 거래처 이력 갱신
       if (cName) loadClientHistory(cName);
 
     } catch (e) {
-      console.error("Supabase 저장 실패:", e);
       setDbStatus("error:" + e.message);
     }
   }
@@ -1217,15 +1208,14 @@ export default function App() {
     if (!DB_ENABLED || !cName) { setClientHistory([]); return; }
     setClientHistoryLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("id, created_at, order_no, group_type, total_qty, total_price, items, sms_text")
-        .eq("client_name", cName)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      setClientHistory(data || []);
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get_client_history", payload: { client_name: cName } })
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error?.message || "조회 실패");
+      setClientHistory(json.data || []);
     } catch (e) {
       console.error("이력 조회 실패:", e);
       setClientHistory([]);
@@ -1300,12 +1290,17 @@ export default function App() {
               <div style={{ fontSize:9,color:"#9a8a6a",letterSpacing:"0.08em" }}>발주 자동화 시스템</div>
               {/* DB 연결 상태 표시 */}
               <button onClick={async () => {
-                if (!DB_ENABLED) { alert("DB_ENABLED=false\nVITE 환경변수가 앱에 로드되지 않았습니다.\nVercel Redeploy가 필요합니다."); return; }
+                if (!DB_ENABLED) { alert("DB_ENABLED=false\nVITE 환경변수가 앱에 로드되지 않았습니다."); return; }
                 try {
-                  const { data, error } = await supabase.from("orders").select("id").limit(1);
-                  if (error) alert("❌ DB 연결 실패\n" + JSON.stringify(error, null, 2));
-                  else alert("✅ DB 연결 성공\nSupabase 정상 연결됨");
-                } catch(e) { alert("❌ 네트워크 오류\n" + e.message); }
+                  const res = await fetch("/api/db", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "test" })
+                  });
+                  const json = await res.json();
+                  if (!res.ok || json.error) alert("❌ DB 연결 실패\n" + JSON.stringify(json.error, null, 2));
+                  else alert("✅ DB 연결 성공");
+                } catch(e) { alert("❌ 오류\n" + e.message); }
               }} style={{
                 fontSize:9, padding:"1px 5px", borderRadius:4, border:"none", cursor:"pointer",
                 background: DB_ENABLED ? "#dcfce7" : "#fee2e2",
