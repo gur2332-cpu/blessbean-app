@@ -1296,7 +1296,24 @@ export default function App() {
           <div style={S.logo}>☕</div>
           <div>
             <div style={{ fontWeight:800,fontSize:14,color:"#8b6914",letterSpacing:"0.05em" }}>BLESSBEAN</div>
-            <div style={{ fontSize:9,color:"#9a8a6a",letterSpacing:"0.08em" }}>발주 자동화 시스템</div>
+            <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+              <div style={{ fontSize:9,color:"#9a8a6a",letterSpacing:"0.08em" }}>발주 자동화 시스템</div>
+              {/* DB 연결 상태 표시 */}
+              <button onClick={async () => {
+                if (!DB_ENABLED) { alert("DB_ENABLED=false\nVITE 환경변수가 앱에 로드되지 않았습니다.\nVercel Redeploy가 필요합니다."); return; }
+                try {
+                  const { data, error } = await supabase.from("orders").select("id").limit(1);
+                  if (error) alert("❌ DB 연결 실패\n" + JSON.stringify(error, null, 2));
+                  else alert("✅ DB 연결 성공\nSupabase 정상 연결됨");
+                } catch(e) { alert("❌ 네트워크 오류\n" + e.message); }
+              }} style={{
+                fontSize:9, padding:"1px 5px", borderRadius:4, border:"none", cursor:"pointer",
+                background: DB_ENABLED ? "#dcfce7" : "#fee2e2",
+                color: DB_ENABLED ? "#166534" : "#991b1b",
+              }}>
+                {DB_ENABLED ? "DB●" : "DB○"}
+              </button>
+            </div>
           </div>
         </div>
         <div style={{ display:"flex",gap:4 }}>
@@ -1694,7 +1711,11 @@ export default function App() {
                     }}>
                       {dbStatus==="saving" && "⏳ DB 저장 중..."}
                       {dbStatus==="saved"  && "✅ DB 저장 완료"}
-                      {dbStatus?.startsWith("error:") && `❌ DB 오류: ${dbStatus.replace("error:","")} — Supabase RLS 정책 확인 필요`}
+                      {dbStatus?.startsWith("error:") && (
+                        dbStatus.includes("Load failed") || dbStatus.includes("TypeError")
+                          ? `❌ Supabase 연결 실패 — Vercel 환경변수(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) 확인 후 Redeploy 필요`
+                          : `❌ DB 오류: ${dbStatus.replace("error:","")}`
+                      )}
                     </div>
                   )}
                   <div style={{ display:"flex",gap:9 }}>
