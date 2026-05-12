@@ -1172,8 +1172,10 @@ export default function App() {
         .single();
 
       if (error) {
-        console.error("Supabase 저장 오류:", error.message, error.code);
-        setDbStatus("error:" + error.message);
+        // 오류 전체를 화면에 표시 (code + message + hint + details)
+        const errMsg = `code:${error.code} / ${error.message}${error.hint ? " / hint:"+error.hint : ""}`;
+        console.error("Supabase 저장 오류 전체:", JSON.stringify(error));
+        setDbStatus("error:" + errMsg);
         return;
       }
 
