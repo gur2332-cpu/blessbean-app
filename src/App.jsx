@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { createClient } from "@supabase/supabase-js";
 
-// ── Supabase 초기화 ───────────────────────────────────────────────────────
 const SUPA_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPA_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = (SUPA_URL && SUPA_KEY) ? createClient(SUPA_URL, SUPA_KEY) : null;
@@ -1036,13 +1035,34 @@ function UploadTab({ onPriceList, onClients, onStockMap }) {
   );
 }
 
+// ── localStorage 헬퍼 ────────────────────────────────────────────────────
+function loadFromStorage(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? JSON.parse(v) : fallback;
+  } catch { return fallback; }
+}
+function saveToStorage(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+}
+
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]               = useState("order");
   const [priceList, setPriceList]   = useState(INIT_PRICE_LIST);
   const [clients, setClients]       = useState(INIT_CLIENTS);
-  const [history, setHistory]       = useState([]);
-  const [stockMap, setStockMap]     = useState({}); // 재고표 사진 분석 결과 { 품목명 → {stock, available} } // 최근 발주 내역
+  // 발주 이력 — localStorage에서 초기값 로드
+  const [history, setHistoryState]  = useState(() => loadFromStorage("bb_history", []));
+  const [stockMap, setStockMap]     = useState({});
+
+  // history 변경 시 자동으로 localStorage에 저장
+  function setHistory(updater) {
+    setHistoryState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveToStorage("bb_history", next);
+      return next;
+    });
+  }
 
   // 발주
   const [step, setStep]             = useState("input");
@@ -1106,13 +1126,15 @@ export default function App() {
   }
 
   // ── Supabase: 발주 저장 ────────────────────────────────────────────────
+  const [dbStatus, setDbStatus] = useState(null); // null | "saving" | "saved" | "error"
+
   async function saveToSupabase(ana, its, grp, cName, oNo) {
     if (!DB_ENABLED) return;
+    setDbStatus("saving");
     try {
       const totalQty   = its.reduce((s, it) => s + it.qty, 0);
       const totalPrice = its.reduce((s, it) => s + getPrice(it.matched, grp) * it.qty, 0);
 
-      // orders 테이블에 저장
       const { data: order, error } = await supabase
         .from("orders")
         .insert({
@@ -1134,9 +1156,13 @@ export default function App() {
         .select()
         .single();
 
-      if (error) { console.error("Supabase 저장 오류:", error); return; }
+      if (error) {
+        console.error("Supabase 저장 오류:", error.message, error.code);
+        setDbStatus("error:" + error.message);
+        return;
+      }
 
-      // order_items 테이블에 품목 상세 저장 (패턴 분석용)
+      // order_items 저장
       const itemRows = its
         .filter(it => it.matched)
         .map(it => ({
@@ -1150,10 +1176,19 @@ export default function App() {
         }));
 
       if (itemRows.length > 0) {
-        await supabase.from("order_items").insert(itemRows);
+        const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
+        if (itemErr) console.error("order_items 저장 오류:", itemErr.message);
       }
+
+      setDbStatus("saved");
+      setTimeout(() => setDbStatus(null), 3000);
+
+      // 거래처 이력 갱신
+      if (cName) loadClientHistory(cName);
+
     } catch (e) {
       console.error("Supabase 저장 실패:", e);
+      setDbStatus("error:" + e.message);
     }
   }
 
@@ -1629,14 +1664,28 @@ export default function App() {
                 )}
 
                 {/* 하단 액션 버튼 */}
-                <div style={{ display:"flex",gap:9,marginTop:18 }}>
-                  <button onClick={()=>{ setStep("input");setAna(null);setOrderState({items:[],ambiguous:[]});setMode("form");setOrderNo(genOrderNo()); }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#6b5b3a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
-                  <button onClick={()=>{
-                    saveHistory(analysis, items, activeGroup, selClient?.name||null);
-                    handleBottomCopy();
-                  }} style={{ flex:2,padding:"13px",borderRadius:11,border:"none",background:copyDone?"rgba(212,175,55,0.3)":`linear-gradient(135deg,${G.color},#8b6914)`,color:"#fff",fontSize:13,cursor:"pointer",fontWeight:800,boxShadow:`0 4px 18px ${G.color}44`,transition:"background 0.2s" }}>
-                    {copyDone ? "✓ 복사됨 — 발주 내역 저장됨" : "📄 발주폼 확인 & 복사"}
-                  </button>
+                <div style={{ marginTop:18 }}>
+                  {dbStatus && (
+                    <div style={{
+                      marginBottom:8, padding:"8px 12px", borderRadius:8, fontSize:11, fontWeight:600,
+                      background: dbStatus==="saved" ? "#f0fdf4" : dbStatus==="saving" ? "#eff6ff" : "#fef2f2",
+                      color:      dbStatus==="saved" ? "#059669" : dbStatus==="saving" ? "#2563eb" : "#dc2626",
+                      border:     `1px solid ${dbStatus==="saved" ? "#86efac" : dbStatus==="saving" ? "#bfdbfe" : "#fca5a5"}`,
+                    }}>
+                      {dbStatus==="saving" && "⏳ DB 저장 중..."}
+                      {dbStatus==="saved"  && "✅ DB 저장 완료"}
+                      {dbStatus?.startsWith("error:") && `❌ DB 오류: ${dbStatus.replace("error:","")} — Supabase RLS 정책 확인 필요`}
+                    </div>
+                  )}
+                  <div style={{ display:"flex",gap:9 }}>
+                    <button onClick={()=>{ setStep("input");setAna(null);setOrderState({items:[],ambiguous:[]});setMode("form");setOrderNo(genOrderNo()); }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#6b5b3a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
+                    <button onClick={()=>{
+                      saveHistory(analysis, items, activeGroup, selClient?.name||null);
+                      handleBottomCopy();
+                    }} style={{ flex:2,padding:"13px",borderRadius:11,border:"none",background:copyDone?"rgba(212,175,55,0.3)":`linear-gradient(135deg,${G.color},#8b6914)`,color:"#fff",fontSize:13,cursor:"pointer",fontWeight:800,boxShadow:`0 4px 18px ${G.color}44`,transition:"background 0.2s" }}>
+                      {copyDone ? "✓ 복사됨 — 발주 저장됨" : "📄 발주폼 확인 & 복사"}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
