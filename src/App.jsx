@@ -825,29 +825,50 @@ function parseUploadedClients(rows) {
 function parseStockExcel(rows) {
   if (!rows || rows.length < 2) return null;
 
-  // 헤더 행 찾기
-  const headerIdx = findHeaderRow(rows, ["품목명", "판매가능수량"]);
-  const headers = rows[headerIdx].map(h => cellStr(h).replace(/\s/g, "").toLowerCase());
+  // 헤더 행 찾기 (최대 5행 탐색) - '품목명' 포함된 행
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    if (rows[i].some(c => cellStr(c) === "품목명")) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) return { error: "'품목명' 헤더를 찾을 수 없습니다." };
 
-  // "품목명" 열
-  const nameIdx = headers.findIndex(h => h === "품목명" || h === "상품명");
-  if (nameIdx === -1) return null;
+  const header = rows[headerIdx];
 
-  // "판매가능수량(kg)" 또는 "판매가능수량" 열
-  const stockIdx = headers.findIndex(h =>
-    h === "판매가능수량(kg)" || h === "판매가능수량" || h.startsWith("판매가능")
-  );
-  if (stockIdx === -1) return null;
+  // 품목명 열 (정확히 "품목명"인 열)
+  const nameIdx = header.findIndex(h => cellStr(h) === "품목명");
 
+  // 판매가능수량 열 — 줄바꿈 포함 다양한 형태 허용
+  const stockIdx = header.findIndex(h => {
+    const v = cellStr(h).replace(/\s|\n/g, "");
+    return v.includes("판매가능") && v.includes("수량");
+  });
+
+  if (stockIdx === -1) return { error: `'판매가능수량' 열을 찾을 수 없습니다. 헤더: ${header.filter(Boolean).map(h=>cellStr(h).replace(/\n/g," ")).join(", ")}` };
+
+  // 데이터는 헤더 이후 (서브헤더 행 건너뜀)
+  // 서브헤더(숫자만 있거나 비어있는 행) 스킵하고 품목명이 있는 행부터
   const result = {};
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const r = rows[i];
     const name = cellStr(r[nameIdx]);
-    if (!name) continue;
+    if (!name || name.length < 2) continue;
+    // 숫자만 있는 서브헤더 행 스킵
+    if (/^\d+$/.test(name)) continue;
     const stock = cellNum(r[stockIdx]);
-    result[name] = { stock, available: stock > 0, unit: "kg" };
+    // 같은 품목명이 여러 행 있으면 합산 (Lot 별로 나뉜 경우)
+    if (result[name]) {
+      result[name].stock += stock;
+      result[name].available = result[name].stock > 0;
+    } else {
+      result[name] = { stock, available: stock > 0, unit: "kg" };
+    }
   }
-  return Object.keys(result).length > 0 ? result : null;
+
+  if (Object.keys(result).length === 0) return { error: "품목 데이터가 없습니다." };
+  return result;
 }
 
 // ── 품목 검색 자동완성 컴포넌트 ──────────────────────────────────────────
@@ -949,8 +970,20 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
       
       const buf = await file.arrayBuffer();
       const wb  = XLSX.read(buf, { type:"array" });
-      const ws  = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(ws, { header:1 });
+
+      // 재고표는 날짜별 시트 중 가장 최근 것 자동 선택
+      let sheetName = wb.SheetNames[0];
+      if (type === "stock") {
+        // 날짜 형태 시트명 필터 (예: 2026.05.08, 2026.4.1)
+        const dateSheets = wb.SheetNames.filter(n => /\d{4}\.\d+/.test(n));
+        if (dateSheets.length > 0) {
+          sheetName = dateSheets[dateSheets.length - 1]; // 가장 마지막(최신)
+          setStatus(s=>({...s, stock:`🔍 시트 "${sheetName}" 읽는 중...`}));
+        }
+      }
+
+      const ws = wb.Sheets[sheetName];
+      rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:"" });
     }
 
     if (type === "prices") {
@@ -974,10 +1007,13 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
       setStatus(s=>({...s, clients:`✅ ${parsed.items.length}개 거래처 불러옴${warnMsg}`}));
 
     } else if (type === "stock") {
-      // 재고표 엑셀 파싱 — 품목명 + 판매가능수량(맨 오른쪽 두 번째 열)
       const parsed = parseStockExcel(rows);
-      if (!parsed || Object.keys(parsed).length === 0) {
-        setStatus(s=>({...s, stock:"❌ 인식 실패 — '품목명' 열과 재고 수량 열이 있는지 확인하세요."}));
+      if (!parsed) {
+        setStatus(s=>({...s, stock:"❌ 인식 실패 — '품목명' 열이 있는지 확인하세요."}));
+        return;
+      }
+      if (parsed.error) {
+        setStatus(s=>({...s, stock:`❌ ${parsed.error}`}));
         return;
       }
       onStockMap(parsed);
