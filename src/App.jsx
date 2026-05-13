@@ -929,7 +929,7 @@ function ProductSearch({ priceList, selected, group, onSelect, placeholder="품�
 }
 
 // ── 업로드 탭 ─────────────────────────────────────────────────────────────
-function UploadTab({ onPriceList, onClients, onStockMap }) {
+function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatus: _setStatus }) {
   const [status, setStatus]     = useState({ prices:null, clients:null, stock:null });
   const [xlsxReady, setXlsxReady] = useState(false);
   const priceRef  = useRef();
@@ -1014,6 +1014,32 @@ function UploadTab({ onPriceList, onClients, onStockMap }) {
       </p>
 
       {zone("📦 재고표 업로드", "헤더: 품목명 | 판매가능수량 (매일 업데이트)", stockRef, "stock", status.stock)}
+
+      {/* 현재 로드된 재고 미리보기 */}
+      {Object.keys(stockMap).length > 0 && (
+        <div style={{ marginTop:-8, marginBottom:14, padding:"12px 14px", borderRadius:10, background:"#f0fdf4", border:"1px solid #86efac" }}>
+          <div style={{ fontSize:11, fontWeight:700, color:"#059669", marginBottom:8 }}>
+            ✓ 재고표 로드됨 — {Object.keys(stockMap).length}개 품목
+          </div>
+          <div style={{ maxHeight:150, overflowY:"auto" }}>
+            {Object.entries(stockMap).slice(0, 10).map(([name, entry], i) => (
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:11, padding:"3px 0", borderBottom:"1px solid #dcfce7" }}>
+                <span style={{ color:"#1a1208" }}>{name}</span>
+                <span style={{ fontWeight:700, color: !entry.available ? "#dc2626" : entry.stock < 20 ? "#d97706" : "#059669" }}>
+                  {!entry.available ? "품절" : `${entry.stock}kg`}
+                </span>
+              </div>
+            ))}
+            {Object.keys(stockMap).length > 10 && (
+              <div style={{ fontSize:10, color:"#9a8a6a", marginTop:4 }}>외 {Object.keys(stockMap).length - 10}개...</div>
+            )}
+          </div>
+          <button onClick={() => { setStockMap({}); setStatus(s=>({...s, stock:null})); }}
+            style={{ marginTop:8, padding:"4px 10px", borderRadius:6, border:"1px solid #86efac", background:"transparent", color:"#6b8b6a", fontSize:10, cursor:"pointer" }}>
+            재고 초기화
+          </button>
+        </div>
+      )}
       {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices)}
       {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients)}
 
@@ -1341,7 +1367,7 @@ export default function App() {
       <main style={{ maxWidth:780,margin:"0 auto",padding:"22px 15px" }}>
 
         {/* ══ 업로드 탭 ══ */}
-        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} onStockMap={setStockMap} />}
+        {tab==="upload" && <UploadTab onPriceList={setPriceList} onClients={rows=>setClients(rows)} onStockMap={setStockMap} stockMap={stockMap} setStatus={()=>{}} />}
 
         {/* ══ 단가표 탭 ══ */}
         {tab==="pricelist" && (
@@ -1546,15 +1572,27 @@ export default function App() {
 
                 {/* 재고 확인 배너 - 재고표가 업로드된 경우에만 표시 */}
                 {Object.keys(stockMap).length > 0 && items.length > 0 && (() => {
+                  // 재고표 품목명과 단가표 품목명 매칭 - 교집합 단어 방식
+                  function matchStock(productName) {
+                    const pWords = new Set(
+                      productName.toLowerCase().split(/[\s\-\/\[\]]+/)
+                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w))
+                    );
+                    let bestEntry = null, bestScore = 0;
+                    for (const [sName, sEntry] of Object.entries(stockMap)) {
+                      const sWords = sName.toLowerCase().split(/[\s\-\/\[\]]+/)
+                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w));
+                      const overlap = sWords.filter(w => pWords.has(w)).length;
+                      if (overlap > bestScore) { bestScore = overlap; bestEntry = sEntry; }
+                    }
+                    return bestScore >= 2 ? bestEntry : null; // 2단어 이상 일치해야 매칭
+                  }
+
                   const stockChecks = items.map(it => {
                     const p = it.matched;
                     if (!p) return null;
-                    const stockEntry = Object.entries(stockMap).find(([sName]) =>
-                      sName.includes(p.name.substring(0,6)) ||
-                      p.name.includes(sName.substring(0,6)) ||
-                      p.name.split(" ").some(w => w.length > 3 && sName.includes(w))
-                    );
-                    return { name: p.name, qty: it.qty, entry: stockEntry?.[1] || null };
+                    const entry = matchStock(p.name);
+                    return { name: p.name, qty: it.qty, entry };
                   }).filter(Boolean);
 
                   const warnings = stockChecks.filter(c => c.entry && (!c.entry.available || (c.entry.stock >= 0 && c.entry.stock < c.qty)));
@@ -1563,9 +1601,12 @@ export default function App() {
 
                   return (
                     <div style={{ marginBottom:14, padding:"13px 14px", borderRadius:12, border:"1px solid #e0d5b8", background:"#fff" }}>
-                      <div style={{ fontWeight:700, fontSize:12, color:"#6b5b3a", marginBottom:10, display:"flex", alignItems:"center", gap:6 }}>
-                        📦 재고 확인
-                        <span style={{ fontSize:10, color:"#9a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
+                      <div style={{ fontWeight:700, fontSize:12, color:"#6b5b3a", marginBottom:10, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                          📦 재고 확인
+                          <span style={{ fontSize:10, color:"#9a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
+                        </div>
+                        <span style={{ fontSize:10, color:"#059669" }}>✓ 재고표 {Object.keys(stockMap).length}개 품목</span>
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                         {warnings.map((c, i) => (
