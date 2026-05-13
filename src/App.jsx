@@ -1606,11 +1606,31 @@ export default function App() {
 
                 {/* 재고 확인 배너 - 재고표가 업로드된 경우에만 표시 */}
                 {Object.keys(stockMap).length > 0 && items.length > 0 && (() => {
+                  // 발주폼 품목명 기준으로 재고표에서 최적 매칭
+                  // 핵심: 발주폼의 고유 단어(원산지명, 농장명)가 재고표에 없으면 제외
+                  function findBestStock(productName) {
+                    const pWords = new Set(
+                      productName.toLowerCase().split(/[\s\-\/\[\]()]+/)
+                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w))
+                    );
+                    let bestEntry = null, bestRatio = 0, bestOverlap = 0;
+                    for (const [sName, sEntry] of Object.entries(stockMap)) {
+                      const sWords = sName.toLowerCase().split(/[\s\-\/\[\]()]+/)
+                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w));
+                      if (sWords.length === 0) continue;
+                      const overlap = sWords.filter(w => pWords.has(w)).length;
+                      const ratio = overlap / sWords.length; // 재고표 단어 기준 포함 비율
+                      if (ratio > bestRatio || (ratio === bestRatio && overlap > bestOverlap)) {
+                        bestRatio = ratio; bestOverlap = overlap; bestEntry = sEntry;
+                      }
+                    }
+                    return bestRatio >= 0.5 ? bestEntry : null; // 50% 이상 일치만 매칭
+                  }
+
                   const stockChecks = items.map(it => {
                     const p = it.matched;
                     if (!p) return null;
-                    // 100% 품목명 일치로만 매칭
-                    const entry = stockMap[p.name] || null;
+                    const entry = findBestStock(p.name);
                     return { name: p.name, qty: it.qty, entry };
                   }).filter(Boolean);
 
