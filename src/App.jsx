@@ -826,20 +826,18 @@ function parseStockExcel(rows) {
   if (!rows || rows.length < 2) return null;
 
   // 헤더 행 찾기
-  const headerIdx = findHeaderRow(rows, ["품목", "name", "판매", "가능", "재고", "수량"]);
-  const headers = rows[headerIdx].map(h => cellStr(h).toLowerCase());
+  const headerIdx = findHeaderRow(rows, ["품목명", "판매가능수량"]);
+  const headers = rows[headerIdx].map(h => cellStr(h).replace(/\s/g, "").toLowerCase());
 
-  const nameIdx = headers.findIndex(h => /품목명?|상품명?|name/i.test(h));
+  // "품목명" 열
+  const nameIdx = headers.findIndex(h => h === "품목명" || h === "상품명");
   if (nameIdx === -1) return null;
 
-  // 판매가능수량 열: "판매가능" or "판매 가능" or "가용" or "잔여" 우선,
-  // 없으면 맨 오른쪽에서 두 번째 숫자 열
-  let stockIdx = headers.findIndex(h => /판매.*가능|가용|잔여|available/i.test(h));
-  if (stockIdx === -1) {
-    // 마지막 열에서 두 번째 — 실제 재고표 기준
-    stockIdx = rows[headerIdx].length - 2;
-    if (stockIdx <= nameIdx) stockIdx = rows[headerIdx].length - 1;
-  }
+  // "판매가능수량(kg)" 또는 "판매가능수량" 열
+  const stockIdx = headers.findIndex(h =>
+    h === "판매가능수량(kg)" || h === "판매가능수량" || h.startsWith("판매가능")
+  );
+  if (stockIdx === -1) return null;
 
   const result = {};
   for (let i = headerIdx + 1; i < rows.length; i++) {
@@ -849,7 +847,7 @@ function parseStockExcel(rows) {
     const stock = cellNum(r[stockIdx]);
     result[name] = { stock, available: stock > 0, unit: "kg" };
   }
-  return result;
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 // ── 품목 검색 자동완성 컴포넌트 ──────────────────────────────────────────
@@ -1572,26 +1570,11 @@ export default function App() {
 
                 {/* 재고 확인 배너 - 재고표가 업로드된 경우에만 표시 */}
                 {Object.keys(stockMap).length > 0 && items.length > 0 && (() => {
-                  // 재고표 품목명과 단가표 품목명 매칭 - 교집합 단어 방식
-                  function matchStock(productName) {
-                    const pWords = new Set(
-                      productName.toLowerCase().split(/[\s\-\/\[\]]+/)
-                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w))
-                    );
-                    let bestEntry = null, bestScore = 0;
-                    for (const [sName, sEntry] of Object.entries(stockMap)) {
-                      const sWords = sName.toLowerCase().split(/[\s\-\/\[\]]+/)
-                        .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w));
-                      const overlap = sWords.filter(w => pWords.has(w)).length;
-                      if (overlap > bestScore) { bestScore = overlap; bestEntry = sEntry; }
-                    }
-                    return bestScore >= 2 ? bestEntry : null; // 2단어 이상 일치해야 매칭
-                  }
-
                   const stockChecks = items.map(it => {
                     const p = it.matched;
                     if (!p) return null;
-                    const entry = matchStock(p.name);
+                    // 100% 품목명 일치로만 매칭
+                    const entry = stockMap[p.name] || null;
                     return { name: p.name, qty: it.qty, entry };
                   }).filter(Boolean);
 
@@ -1606,7 +1589,7 @@ export default function App() {
                           📦 재고 확인
                           <span style={{ fontSize:10, color:"#9a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
                         </div>
-                        <span style={{ fontSize:10, color:"#059669" }}>✓ 재고표 {Object.keys(stockMap).length}개 품목</span>
+                        <span style={{ fontSize:10, color:"#059669" }}>✓ {Object.keys(stockMap).length}개 품목 로드</span>
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                         {warnings.map((c, i) => (
