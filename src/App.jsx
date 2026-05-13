@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 
-// /api/db 프록시를 통해 Supabase 접근 (브라우저에서 직접 접근 불필요)
 const DB_ENABLED = true;
 let supabase = null;
 
@@ -1213,7 +1212,22 @@ export default function App() {
       });
       const json = await res.json();
       if (!res.ok || json.error) throw new Error(json.error?.message || "조회 실패");
-      setClientHistory(json.data || []);
+
+      // 중복 제거: 품목 구성이 같으면 최신 것 1개만 유지
+      const raw = json.data || [];
+      const seen = new Set();
+      const deduped = raw.filter(h => {
+        // 품목명+수량 조합으로 고유 키 생성
+        const key = (h.items || [])
+          .map(it => `${it.product_name}:${it.qty}`)
+          .sort()
+          .join("|");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setClientHistory(deduped);
     } catch (e) {
       console.error("이력 조회 실패:", e);
       setClientHistory([]);
