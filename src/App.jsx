@@ -1628,6 +1628,21 @@ export default function App() {
                 {Object.keys(stockMap).length > 0 && items.length > 0 && (() => {
                   // 발주폼 품목명 기준으로 재고표에서 최적 매칭
                   // 핵심: 발주폼의 고유 단어(원산지명, 농장명)가 재고표에 없으면 제외
+                  // 충돌 그룹: 같은 그룹 내 서로 다른 단어가 발주폼-재고표에 있으면 다른 품목
+                  const CONFLICT_GROUPS = [
+                    new Set(['g1','g2','g3','g4']),
+                    new Set(['워시드','내추럴','허니','펄프드내추럴','세미워시드','웻헐드']),
+                  ];
+                  function hasConflict(pSet, sWords) {
+                    for (const group of CONFLICT_GROUPS) {
+                      const pMatch = [...pSet].filter(w => group.has(w));
+                      const sMatch = sWords.filter(w => group.has(w));
+                      if (pMatch.length > 0 && sMatch.length > 0) {
+                        if (!pMatch.some(w => sMatch.includes(w))) return true;
+                      }
+                    }
+                    return false;
+                  }
                   function findBestStock(productName) {
                     const pWords = new Set(
                       productName.toLowerCase().split(/[\s\-\/\[\]()]+/)
@@ -1638,13 +1653,14 @@ export default function App() {
                       const sWords = sName.toLowerCase().split(/[\s\-\/\[\]()]+/)
                         .filter(w => w.length >= 2 && !PARSE_SKIP_WORDS.has(w) && !/^\d+$/.test(w));
                       if (sWords.length === 0) continue;
+                      if (hasConflict(pWords, sWords)) continue; // 등급/가공방식 충돌 시 제외
                       const overlap = sWords.filter(w => pWords.has(w)).length;
-                      const ratio = overlap / sWords.length; // 재고표 단어 기준 포함 비율
+                      const ratio = overlap / sWords.length;
                       if (ratio > bestRatio || (ratio === bestRatio && overlap > bestOverlap)) {
                         bestRatio = ratio; bestOverlap = overlap; bestEntry = sEntry;
                       }
                     }
-                    return bestRatio >= 0.5 ? bestEntry : null; // 50% 이상 일치만 매칭
+                    return bestRatio >= 0.5 ? bestEntry : null;
                   }
 
                   const stockChecks = items.map(it => {
