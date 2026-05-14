@@ -1124,7 +1124,12 @@ export default function App() {
   const [clients, setClients]       = useState(INIT_CLIENTS);
   // 발주 이력 — localStorage에서 초기값 로드
   const [history, setHistoryState]  = useState(() => loadFromStorage("bb_history", []));
-  const [stockMap, setStockMap]     = useState({});
+  const [stockMap, setStockMapState] = useState(() => loadFromStorage("bb_stockmap", {}));
+  function setStockMap(value) {
+    const next = typeof value === "function" ? value(stockMap) : value;
+    saveToStorage("bb_stockmap", next);
+    setStockMapState(next);
+  }
 
   // history 변경 시 자동으로 localStorage에 저장
   function setHistory(updater) {
@@ -1494,9 +1499,24 @@ export default function App() {
 
                 <ClientSearch clients={clients} selClient={selClient} onSelect={c => {
                   setSelClient(c);
-                  if (c) loadClientHistory(c.name);
-                  else setClientHistory([]);
+                  if (c) { loadClientHistory(c.name); setPhone(c.phone||""); }
+                  else { setClientHistory([]); setPhone(""); }
                 }} manualGroup={manualGroup} onManualGroup={setManualGroup} />
+
+                <label style={S.label}>연락처</label>
+                <input
+                  value={selClient ? (selClient.phone||"번호 없음") : phone}
+                  onChange={e => { if (!selClient) setPhone(e.target.value); }}
+                  placeholder="010-0000-0000"
+                  readOnly={!!selClient}
+                  style={{
+                    ...S.input,
+                    marginBottom:14,
+                    background: selClient ? "rgba(0,0,0,0.03)" : "#fff",
+                    color: selClient ? "#9a8a6a" : "#1a1208",
+                    cursor: selClient ? "default" : "text",
+                  }}
+                />
 
                 <label style={S.label}>문자 내용 *</label>
                 <textarea value={sms} onChange={e=>setSms(e.target.value)} placeholder="거래처에서 받은 문자를 그대로 붙여넣으세요…" rows={6} style={S.textarea} />
