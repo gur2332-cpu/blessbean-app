@@ -1359,70 +1359,59 @@ export default function App() {
 
       {/* 헤더 */}
       <header style={S.header}>
-        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          {/* 블레스빈 공식 로고 */}
+        {/* 로고 영역 */}
+        <div style={{ display:"flex", alignItems:"center", gap:7, flexShrink:0 }}>
           <img
             src="https://www.blessbean.co.kr/data/apms/seo/logo1_250515115319.png"
             alt="BLESS BEAN"
-            style={{ height:38, objectFit:"contain", display:"block" }}
+            style={{ height:32, objectFit:"contain", display:"block" }}
             onError={e => {
               e.target.style.display = "none";
               e.target.nextSibling.style.display = "flex";
             }}
           />
-          {/* 로고 이미지 로드 실패 시 폴백 */}
-          <div style={{ display:"none", alignItems:"center", gap:8 }}>
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <rect width="36" height="36" rx="4" fill="#c41230"/>
-              <text x="18" y="25" textAnchor="middle" fill="white" fontSize="20" fontWeight="900" fontFamily="Georgia,serif">B</text>
+          {/* 폴백 로고 */}
+          <div style={{ display:"none", alignItems:"center", gap:6 }}>
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+              <rect width="30" height="30" rx="3" fill="#c41230"/>
+              <text x="15" y="21" textAnchor="middle" fill="white" fontSize="17" fontWeight="900" fontFamily="Georgia,serif">B</text>
             </svg>
-            <div>
-              <div style={{ fontWeight:900, fontSize:15, letterSpacing:"0.10em", lineHeight:1.1 }}>
-                <span style={{ color:"#c41230" }}>BLESS</span>
-                <span style={{ color:"#1a4a2e" }}> BEAN</span>
+            <div style={{ lineHeight:1 }}>
+              <div style={{ fontWeight:900, fontSize:13, letterSpacing:"0.08em" }}>
+                <span style={{ color:"#c41230" }}>BLESS</span><span style={{ color:"#1a4a2e" }}> BEAN</span>
               </div>
-              <div style={{ fontSize:9, color:"#8a7a6a", letterSpacing:"0.08em", marginTop:1 }}>Specialty Coffee</div>
+              <div style={{ fontSize:8, color:"#8a7a6a", letterSpacing:"0.06em", marginTop:2 }}>Specialty Coffee</div>
             </div>
           </div>
-          {/* 구분선 */}
-          <div style={{ width:1, height:22, background:"#e0d4cc", margin:"0 4px" }} />
-          {/* 시스템 배지 */}
-          <div style={{ display:"flex",alignItems:"center",gap:4 }}>
-            <span style={{ fontSize:10, color:"#8a7a6a", letterSpacing:"0.04em", background:"#f5f0eb", padding:"2px 8px", borderRadius:4, border:"1px solid #e8ddd4", fontWeight:500 }}>발주 시스템</span>
-            <button onClick={async () => {
-              if (!DB_ENABLED) { alert("DB_ENABLED=false\nVITE 환경변수가 앱에 로드되지 않았습니다."); return; }
-              try {
-                const res = await fetch("/api/db", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ action: "test" })
-                });
-                const json = await res.json();
-                if (!res.ok || json.error) alert("❌ DB 연결 실패\n" + JSON.stringify(json.error, null, 2));
-                else alert("✅ DB 연결 성공");
-              } catch(e) { alert("❌ 오류\n" + e.message); }
-            }} style={{
-              fontSize:9, padding:"2px 7px", borderRadius:4, border:"none", cursor:"pointer",
-              background: DB_ENABLED ? "#e8f4ed" : "#fee2e2",
-              color: DB_ENABLED ? "#1a4a2e" : "#991b1b",
-              fontWeight:700, letterSpacing:"0.02em",
-            }}>
-              {DB_ENABLED ? "DB●" : "DB○"}
-            </button>
-          </div>
+          {/* DB 버튼 - 로고 바로 옆에 작게 */}
+          <button onClick={async () => {
+            if (!DB_ENABLED) { alert("DB_ENABLED=false"); return; }
+            try {
+              const res = await fetch("/api/db", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"test"}) });
+              const json = await res.json();
+              if (!res.ok || json.error) alert("❌ DB 연결 실패\n" + JSON.stringify(json.error,null,2));
+              else alert("✅ DB 연결 성공");
+            } catch(e) { alert("❌ 오류\n" + e.message); }
+          }} style={{
+            fontSize:9, padding:"2px 5px", borderRadius:3, border:"none", cursor:"pointer",
+            background: DB_ENABLED ? "#e8f4ed" : "#fee2e2",
+            color: DB_ENABLED ? "#1a4a2e" : "#991b1b",
+            fontWeight:700, flexShrink:0,
+          }}>
+            {DB_ENABLED ? "DB●" : "DB○"}
+          </button>
         </div>
         {/* 탭 네비게이션 */}
-        <div style={{ display:"flex",gap:3 }}>
+        <div style={{ display:"flex", gap:2, flexShrink:0 }}>
           {[["order","발주"],["pricelist","단가표"],["clients","거래처"],["upload","업로드"]].map(([t,l])=>(
             <button key={t} onClick={()=>setTab(t)} style={{
-              padding:"7px 13px", borderRadius:7, fontSize:12, cursor:"pointer",
+              padding:"6px 10px", borderRadius:7, fontSize:12, cursor:"pointer",
               border: tab===t ? "1.5px solid #c41230" : "1.5px solid #ece4dc",
               background: tab===t ? "#c41230" : "transparent",
               color: tab===t ? "#fff" : "#5a4a3a",
               fontWeight: tab===t ? 700 : 500,
               whiteSpace: "nowrap",
               transition: "all 0.15s",
-              letterSpacing: "0.02em",
             }}>{l}</button>
           ))}
         </div>
@@ -1870,7 +1859,7 @@ export default function App() {
 
 const st = {
   wrap:     { minHeight:"100vh",background:"#f7f4ef",fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif",color:"#1a1a18" },
-  header:   { borderBottom:"1px solid #ede4da",padding:"0 20px",background:"#ffffff",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"space-between",height:62,boxShadow:"0 1px 6px rgba(196,18,48,0.07)" },
+  header:   { borderBottom:"1px solid #ede4da",padding:"0 14px",background:"#ffffff",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:56,boxShadow:"0 1px 6px rgba(196,18,48,0.07)" },
   logo:     { height:38,objectFit:"contain" },
   label:    { display:"block",fontSize:11,color:"#5a4a38",marginBottom:7,fontWeight:600,letterSpacing:"0.02em" },
   input:    { width:"100%",padding:"10px 12px",borderRadius:9,background:"#fff",border:"1px solid #e0d4cc",color:"#1a1a18",fontSize:13,outline:"none",boxSizing:"border-box" },
