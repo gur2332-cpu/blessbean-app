@@ -1173,14 +1173,49 @@ export default function App() {
   // 단가표 탭
   const [pgFilter, setPgFilter] = useState("SPECIAL");
   const [pSearch, setPSearch]   = useState("");
+  const [pStockFilter, setPStockFilter] = useState("all"); // all | in | out
+  const [pCountry, setPCountry]   = useState("all");
 
   const orderDate   = new Date().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric"});
   const activeGroup = selClient?.group || manualGroup;
   const G           = GROUPS[activeGroup];
 
-  const filteredPrices = priceList.filter(p =>
-    p.name.includes(pSearch)||p.origin.includes(pSearch)||p.process.includes(pSearch)
-  );
+  // 국가 코드 매핑
+  const COUNTRY_MAP = {
+    DC:"디카페인",BR:"브라질",CO:"콜롬비아",ET:"에티오피아",GT:"과테말라",
+    MX:"멕시코",SV:"엘살바도르",HN:"온두라스",JM:"자메이카",CR:"코스타리카",
+    PA:"파나마",PE:"페루",RW:"르완다",YE:"예멘",UG:"우간다",KE:"케냐",
+    TN:"탄자니아",VN:"베트남",IN:"인도",ID:"인도네시아",PG:"파푸아뉴기니",HI:"하와이"
+  };
+  // 품목코드 앞 2자리로 국가코드 추출
+  function getCountryCode(id) { return (id||"").split("-")[0] || "?"; }
+
+  const filteredPrices = priceList.filter(p => {
+    if (pSearch && !p.name.includes(pSearch) && !p.id.includes(pSearch)) return false;
+    const stockEntry = stockMap[p.id];
+    const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? 0);
+    const hasStock = stockQty > 0;
+    if (pStockFilter === "in" && !hasStock) return false;
+    if (pStockFilter === "out" && hasStock) return false;
+    if (pCountry !== "all" && getCountryCode(p.id) !== pCountry) return false;
+    return true;
+  });
+
+  // 국가별 통계 (재고 있는 품목 수 포함)
+  const countryStats = {};
+  for (const p of priceList) {
+    const cc = getCountryCode(p.id);
+    const sq = stockMap[p.id] ? stockMap[p.id].stock : (p.stock ?? 0);
+    if (!countryStats[cc]) countryStats[cc] = { total:0, inStock:0 };
+    countryStats[cc].total++;
+    if (sq > 0) countryStats[cc].inStock++;
+  }
+  const countryOrder = Object.entries(countryStats)
+    .sort((a,b) => b[1].total - a[1].total)
+    .map(([cc]) => cc);
+
+  const inStockCount  = priceList.filter(p => { const s = stockMap[p.id]; return s ? s.stock > 0 : (p.stock??0)>0; }).length;
+  const outStockCount = priceList.length - inStockCount;
 
   function mapItems(raw) {
     return (raw||[]).map(it => {
@@ -1425,26 +1460,90 @@ export default function App() {
         {/* ══ 단가표 탭 ══ */}
         {tab==="pricelist" && (
           <div>
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
-              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#c41230" }}>단가표 관리</h2>
-              <div style={{ fontSize:11,color:"#4a3a2a" }}>✏️ 클릭 → 단가/재고 수정</div>
+            {/* 제목 */}
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12 }}>
+              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#c41230" }}>단가표</h2>
+              <span style={{ fontSize:11,color:"#8a7a6a" }}>✏️ 카드 클릭 → 수정</span>
             </div>
-            <div style={{ display:"flex",gap:6,marginBottom:12,flexWrap:"wrap" }}>
-              <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="검색" style={{...S.input,flex:1,minWidth:100,padding:"7px 11px",fontSize:12}} />
+
+            {/* 검색 */}
+            <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="품목 검색..." style={{...S.input,width:"100%",marginBottom:8,padding:"8px 11px",fontSize:12}} />
+
+            {/* 재고 필터 */}
+            <div style={{ display:"flex",gap:5,marginBottom:8 }}>
+              {[
+                ["all", `전체 ${priceList.length}`],
+                ["in",  `재고있음 ${inStockCount}`, "#e8f4ed", "#1a4a2e", "#6abf8a"],
+                ["out", `품절 ${outStockCount}`, "#f5f0eb", "#8a7a6a", "#e0d4cc"],
+              ].map(([v,label,bg,tc,bc])=>(
+                <button key={v} onClick={()=>setPStockFilter(v)} style={{
+                  flex:1, padding:"6px 4px", borderRadius:9, fontSize:11, fontWeight:600,
+                  border: pStockFilter===v ? `1.5px solid ${bc||"#c41230"}` : "1px solid #ece4dc",
+                  background: pStockFilter===v ? (bg||"#c41230") : "transparent",
+                  color: pStockFilter===v ? (tc||"#fff") : "#5a4a3a",
+                  cursor:"pointer", whiteSpace:"nowrap",
+                }}>{label}</button>
+              ))}
+            </div>
+
+            {/* 단가그룹 필터 */}
+            <div style={{ display:"flex",gap:4,marginBottom:8,flexWrap:"wrap" }}>
               {GROUP_KEYS.map(k=>{ const g=GROUPS[k]; return (
-                <button key={k} onClick={()=>setPgFilter(k)} style={{ padding:"5px 10px",borderRadius:9,border:`1px solid ${pgFilter===k?g.color:"rgba(0,0,0,0.05)"}`,background:pgFilter===k?g.bg:"transparent",color:pgFilter===k?g.color:"#4a3a2a",fontSize:11,fontWeight:pgFilter===k?700:400,cursor:"pointer" }}>{g.label}</button>
+                <button key={k} onClick={()=>setPgFilter(k)} style={{
+                  padding:"4px 9px", borderRadius:8, fontSize:11,
+                  border:`1px solid ${pgFilter===k?g.color:"rgba(0,0,0,0.05)"}`,
+                  background:pgFilter===k?g.bg:"transparent",
+                  color:pgFilter===k?g.color:"#5a4a3a",
+                  fontWeight:pgFilter===k?700:400, cursor:"pointer"
+                }}>{g.label}</button>
               );})}
             </div>
-            <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+
+            {/* 국가 필터 (가로 스크롤) */}
+            <div style={{ display:"flex",gap:4,marginBottom:10,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none" }}>
+              <button onClick={()=>setPCountry("all")} style={{
+                flexShrink:0, padding:"3px 9px", borderRadius:20, fontSize:11,
+                border: pCountry==="all" ? "1.5px solid #1a4a2e" : "1px solid #ece4dc",
+                background: pCountry==="all" ? "#1a4a2e" : "transparent",
+                color: pCountry==="all" ? "#fff" : "#5a4a3a", cursor:"pointer"
+              }}>전체국가</button>
+              {countryOrder.map(cc=>{
+                const s = countryStats[cc]; if(!s) return null;
+                const isActive = pCountry===cc;
+                return (
+                  <button key={cc} onClick={()=>setPCountry(cc)} style={{
+                    flexShrink:0, padding:"3px 9px", borderRadius:20, fontSize:11,
+                    border: isActive ? "1.5px solid #1a4a2e" : "1px solid #ece4dc",
+                    background: isActive ? "#1a4a2e" : "transparent",
+                    color: isActive ? "#fff" : "#5a4a3a", cursor:"pointer",
+                  }}>{COUNTRY_MAP[cc]||cc} {s.inStock>0?<span style={{color:isActive?"#aedba4":"#2f9e44",fontWeight:700}}>{s.inStock}</span>:""}/{s.total}</button>
+                );
+              })}
+            </div>
+
+            {/* 품목 카드 목록 */}
+            <div style={{ display:"flex",flexDirection:"column",gap:5 }}>
+              {filteredPrices.length === 0 && (
+                <div style={{ textAlign:"center",padding:"30px 0",color:"#8a7a6a",fontSize:13 }}>
+                  검색 결과가 없습니다
+                </div>
+              )}
               {filteredPrices.map((p,i)=>{
                 const stockEntry = stockMap[p.id];
-                const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? null);
-                const hasStock = stockQty !== null && stockQty !== undefined && stockQty !== 0;
+                const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? 0);
+                const hasStock = stockQty > 0;
                 const lowStock = hasStock && stockQty < 30;
                 const midStock = hasStock && stockQty >= 30 && stockQty < 80;
                 const stockColor = !hasStock ? "#ccc" : lowStock ? "#e03131" : midStock ? "#f08c00" : "#2f9e44";
                 return (
-                  <div key={p.id} onClick={()=>setPriceModal(p)} style={{ padding:"12px 14px",borderRadius:12,border:"1px solid #ede4da",background:i%2===0?"#fff":"#fdfaf6",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10 }}>
+                  <div key={p.id} onClick={()=>setPriceModal(p)}
+                    style={{ padding:"10px 12px", borderRadius:12,
+                      border:"1px solid #ede4da",
+                      background: i%2===0?"#fff":"#fdfaf6",
+                      cursor:"pointer",
+                      display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
+                      opacity: hasStock ? 1 : 0.45,
+                    }}>
                     <div style={{ flex:1,minWidth:0 }}>
                       <div style={{ fontWeight:700,color:"#1a1a18",fontSize:13,lineHeight:1.35 }}>{p.name}</div>
                       <div style={{ marginTop:4,display:"flex",gap:8,flexWrap:"wrap" }}>
@@ -1456,8 +1555,8 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
-                      <div style={{ fontWeight:800,fontSize:16,color:stockColor,whiteSpace:"nowrap" }}>
-                        {hasStock ? `${stockQty}kg` : "—"}
+                      <div style={{ fontWeight:700,fontSize:15,color:stockColor,whiteSpace:"nowrap" }}>
+                        {hasStock ? `${stockQty.toLocaleString()}kg` : "—"}
                         {lowStock && <span style={{ fontSize:10,marginLeft:2 }}>⚠</span>}
                       </div>
                       <span style={{ fontSize:9,color:"#bbb" }}>✏️ 수정</span>
