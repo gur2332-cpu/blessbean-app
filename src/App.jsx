@@ -1435,31 +1435,36 @@ export default function App() {
                 <button key={k} onClick={()=>setPgFilter(k)} style={{ padding:"5px 10px",borderRadius:9,border:`1px solid ${pgFilter===k?g.color:"rgba(0,0,0,0.05)"}`,background:pgFilter===k?g.bg:"transparent",color:pgFilter===k?g.color:"#4a3a2a",fontSize:11,fontWeight:pgFilter===k?700:400,cursor:"pointer" }}>{g.label}</button>
               );})}
             </div>
-            <div style={S.table}>
-              <div style={{ display:"grid",gridTemplateColumns:"1fr 58px 58px 86px 52px 44px",padding:"9px 12px",background:"rgba(184,134,11,0.08)",borderBottom:"1px solid rgba(212,175,55,0.1)",fontSize:10,color:"#4a3a2a",fontWeight:700 }}>
-                <span>상품명 (전 그룹 단가)</span><span style={{textAlign:"center"}}>원산지</span><span style={{textAlign:"center"}}>가공</span>
-                <span style={{textAlign:"right",color:GROUPS[pgFilter].color}}>{GROUPS[pgFilter].label}</span>
-                <span style={{textAlign:"right"}}>재고</span><span style={{textAlign:"center"}}>수정</span>
-              </div>
-              {filteredPrices.map((p,i)=>(
-                <div key={p.id} style={{ display:"grid",gridTemplateColumns:"1fr 58px 58px 86px 52px 44px",padding:"10px 12px",alignItems:"center",background:i%2===0?"transparent":"#fdf9f2",borderBottom:"1px solid rgba(0,0,0,0.03)" }}>
-                  <div>
-                    <div style={{ fontWeight:600,color:"#1a1a18",fontSize:12 }}>{p.name}</div>
-                    <div style={{ marginTop:3,display:"flex",gap:6,flexWrap:"wrap" }}>
-                      {GROUP_KEYS.map(k=>(
-                        <span key={k} style={{ fontSize:9,color:GROUPS[k].color }}>{GROUPS[k].label.slice(0,2)} {p.prices[k].toLocaleString()}</span>
-                      ))}
+            <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
+              {filteredPrices.map((p,i)=>{
+                const stockEntry = stockMap[p.id];
+                const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? null);
+                const hasStock = stockQty !== null && stockQty !== undefined && stockQty !== 0;
+                const lowStock = hasStock && stockQty < 30;
+                const midStock = hasStock && stockQty >= 30 && stockQty < 80;
+                const stockColor = !hasStock ? "#ccc" : lowStock ? "#e03131" : midStock ? "#f08c00" : "#2f9e44";
+                return (
+                  <div key={p.id} onClick={()=>setPriceModal(p)} style={{ padding:"12px 14px",borderRadius:12,border:"1px solid #ede4da",background:i%2===0?"#fff":"#fdfaf6",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10 }}>
+                    <div style={{ flex:1,minWidth:0 }}>
+                      <div style={{ fontWeight:700,color:"#1a1a18",fontSize:13,lineHeight:1.35 }}>{p.name}</div>
+                      <div style={{ marginTop:4,display:"flex",gap:8,flexWrap:"wrap" }}>
+                        {GROUP_KEYS.map(k=>(
+                          <span key={k} style={{ fontSize:10,color:k===pgFilter?GROUPS[k].color:"#8a7a6a",fontWeight:k===pgFilter?700:400 }}>
+                            {GROUPS[k].label.slice(0,2)} {(p.prices[k]||0).toLocaleString()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
+                      <div style={{ fontWeight:800,fontSize:16,color:stockColor,whiteSpace:"nowrap" }}>
+                        {hasStock ? `${stockQty}kg` : "—"}
+                        {lowStock && <span style={{ fontSize:10,marginLeft:2 }}>⚠</span>}
+                      </div>
+                      <span style={{ fontSize:9,color:"#bbb" }}>✏️ 수정</span>
                     </div>
                   </div>
-                  <div style={{ textAlign:"center",color:"#7a7060",fontSize:11 }}>{p.origin}</div>
-                  <div style={{ textAlign:"center" }}>
-                    <span style={{ padding:"1px 6px",borderRadius:8,fontSize:10,background:p.process==="워시드"?"rgba(100,150,255,0.12)":p.process==="내추럴"?"rgba(255,120,80,0.12)":"rgba(120,200,120,0.12)",color:p.process==="워시드"?"#8aabff":p.process==="내추럴"?"#ff9a7a":"#8ad08a" }}>{p.process}</span>
-                  </div>
-                  <div style={{ textAlign:"right",color:GROUPS[pgFilter].color,fontWeight:700,fontSize:13 }}>{p.prices[pgFilter].toLocaleString()}</div>
-                  <div style={{ textAlign:"right",fontWeight:600,fontSize:12,color:p.stock<30?"#ff6b6b":p.stock<80?"#ffa94d":"#69db7c" }}>{p.stock}{p.stock<30&&"⚠"}</div>
-                  <div style={{ textAlign:"center" }}><button onClick={()=>setPriceModal(p)} style={{ padding:"3px 8px",borderRadius:6,border:"1px solid rgba(212,175,55,0.3)",background:"transparent",color:"#4a3a2a",fontSize:10,cursor:"pointer" }}>✏️</button></div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
