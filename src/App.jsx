@@ -6,7 +6,7 @@ let supabase = null;
 
 // ── 단가그룹 ──────────────────────────────────────────────────────────────
 const GROUPS = {
-  COE:     { label:"COE",     color:"#c41230", bg:"rgba(196,18,48,0.08)"   },
+  COE:     { label:"COE",     color:"#b8860b", bg:"rgba(184,134,11,0.1)"   },
   HIGH:    { label:"하이엔드", color:"#7c3aed", bg:"rgba(124,58,237,0.08)"  },
   SPECIAL: { label:"스페셜",   color:"#059669", bg:"rgba(5,150,105,0.08)"   },
   PREMIUM: { label:"프리미엄", color:"#2563eb", bg:"rgba(37,99,235,0.08)"   },
@@ -336,7 +336,7 @@ function CopyBtn({ text, label="📋 문자 복사", style={} }) {
   const [done, setDone] = useState(false);
   function go() { copyToClipboard(text, () => { setDone(true); setTimeout(()=>setDone(false),2000); }); }
   return (
-    <button onClick={go} style={{ padding:"5px 13px", borderRadius:8, border:"1px solid rgba(196,18,48,0.35)", background:done?"rgba(196,18,48,0.15)":"transparent", color:done?"#c41230":"#4a3a2a", fontSize:12, cursor:"pointer", fontWeight:600, whiteSpace:"nowrap", ...style }}>
+    <button onClick={go} style={{ padding:"5px 13px", borderRadius:8, border:"1px solid rgba(212,175,55,0.4)", background:done?"rgba(212,175,55,0.18)":"transparent", color:done?"#b8860b":"#7a6a4a", fontSize:12, cursor:"pointer", fontWeight:600, whiteSpace:"nowrap", ...style }}>
       {done ? "✓ 복사됨" : label}
     </button>
   );
@@ -364,12 +364,12 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
   }
 
   return (
-    <div style={{ borderRadius:16, border:`2px solid ${G.color}44`, background:"#ffffff", overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.08)" }}>
+    <div style={{ borderRadius:16, border:`2px solid ${G.color}44`, background:"#fffdf7", overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.08)" }}>
       {/* 발주폼 헤더 + 탭 */}
       <div style={{ padding:"12px 14px", background:`linear-gradient(135deg,${G.bg},#fffdf7)`, borderBottom:`1px solid ${G.color}33` }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontWeight:800, color:"#1a4a2e", fontSize:13 }}>📄 발주폼</span>
+            <span style={{ fontWeight:800, color:"#8b6914", fontSize:13 }}>📄 발주폼</span>
             <span style={{ padding:"2px 9px", borderRadius:10, fontSize:11, fontWeight:700, background:G.bg, color:G.color }}>{G.label}</span>
           </div>
           {/* 결제방식 토글 */}
@@ -377,12 +377,12 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
             <button onClick={()=>{ setPayMethod("account"); setCopied(false); }} style={{
               padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
               background: payMethod==="account" ? "#059669" : "#e8e0cc",
-              color: payMethod==="account" ? "#fff" : "#4a3a2a",
+              color: payMethod==="account" ? "#fff" : "#6b5b3a",
             }}>💳 계좌이체</button>
             <button onClick={()=>{ setPayMethod("card"); setCopied(false); }} style={{
               padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
               background: payMethod==="card" ? "#2563eb" : "#e8e0cc",
-              color: payMethod==="card" ? "#fff" : "#4a3a2a",
+              color: payMethod==="card" ? "#fff" : "#6b5b3a",
             }}>🃏 카드결제</button>
           </div>
         </div>
@@ -390,19 +390,19 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
         <div style={{ display:"flex", gap:6, marginBottom:10 }}>
           <button onClick={()=>{ setCopyTab("client"); setCopied(false); }} style={{
             flex:1, padding:"7px 10px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", border:"none",
-            background: copyTab==="client" ? "#1a4a2e" : "#e8f0e8",
-            color: copyTab==="client" ? "#fff" : "#4a3a2a",
+            background: copyTab==="client" ? "#8b6914" : "#f0ead8",
+            color: copyTab==="client" ? "#fff" : "#6b5b3a",
           }}>거래처 발송용</button>
           <button onClick={()=>{ setCopyTab("order"); setCopied(false); }} style={{
             flex:1, padding:"7px 10px", borderRadius:8, fontSize:12, fontWeight:700, cursor:"pointer", border:"none",
-            background: copyTab==="order" ? "#1a4a2e" : "#e8f0e8",
-            color: copyTab==="order" ? "#fff" : "#4a3a2a",
+            background: copyTab==="order" ? "#8b6914" : "#f0ead8",
+            color: copyTab==="order" ? "#fff" : "#6b5b3a",
           }}>물류팀 오더방용</button>
         </div>
         {/* 복사 버튼 */}
         <button onClick={handleCopy} style={{
           width:"100%", padding:"9px", borderRadius:9, border:"none",
-          background: copied ? "#059669" : "#c41230",
+          background: copied ? "#059669" : "#b8860b",
           color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer", transition:"background 0.2s",
         }}>
           {copied ? "✓ 복사됨!" : copyTab === "client" ? "📋 거래처 발송용 복사" : "📋 물류팀 오더방용 복사"}
@@ -416,31 +416,31 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
             <div>블레스빈 전진혁입니다.</div><div>요청하신 단가 안내드립니다.</div>
           </div>
           <div style={{ borderTop:"1px dashed #d4c49a", margin:"4px 0 14px" }} />
-          {displayName && <div style={{ fontWeight:800, color:"#1a1a18", marginBottom:12 }}>{displayName}</div>}
+          {displayName && <div style={{ fontWeight:800, color:"#1a1208", marginBottom:12 }}>{displayName}</div>}
           <div style={{ marginBottom:16 }}>
-            {items.length===0 && <div style={{ padding:"16px", textAlign:"center", color:"#4a3a2a", fontSize:13, background:"#faf8f4", borderRadius:8 }}>품목 없음 — 항목 편집에서 추가하세요</div>}
+            {items.length===0 && <div style={{ padding:"16px", textAlign:"center", color:"#6b5b3a", fontSize:13, background:"#f5f0e8", borderRadius:8 }}>품목 없음 — 항목 편집에서 추가하세요</div>}
             {items.map((it,i) => { const p=it.matched; const pr=getPrice(p,group); const lp=p?pr*it.qty:null; return (
-              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", marginBottom:5, borderRadius:8, background:p?"rgba(184,134,11,0.05)":"rgba(255,120,80,0.06)", border:`1px solid ${p?"#e0d4cc":"rgba(255,120,80,0.3)"}` }}>
-                <span style={{ color:p?"#1a1a18":"#dc2626", fontSize:13 }}>{p?p.name:<>{it.product_name}<span style={{fontSize:11,marginLeft:4}}>(확인필요)</span></>}</span>
+              <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", marginBottom:5, borderRadius:8, background:p?"rgba(184,134,11,0.05)":"rgba(255,120,80,0.06)", border:`1px solid ${p?"#d4c49a":"rgba(255,120,80,0.3)"}` }}>
+                <span style={{ color:p?"#1a1208":"#dc2626", fontSize:13 }}>{p?p.name:<>{it.product_name}<span style={{fontSize:11,marginLeft:4}}>(확인필요)</span></>}</span>
                 <div style={{ textAlign:"right", marginLeft:12 }}>
                   <div style={{ color:G.color, fontWeight:700, whiteSpace:"nowrap", fontSize:13 }}>{it.qty}kg * {p?`${pr.toLocaleString()}원`:"확인필요"}</div>
-                  {lp && <div style={{ fontSize:11, color:"#4a3a2a" }}>= {lp.toLocaleString()}원</div>}
+                  {lp && <div style={{ fontSize:11, color:"#6b5b3a" }}>= {lp.toLocaleString()}원</div>}
                 </div>
               </div>
             );})}
           </div>
           <div style={{ borderTop:"1px dashed #d4c49a", paddingTop:12 }}>
             {delivFee > 0
-              ? <div style={{ fontSize:13, color:"#4a3a2a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원 <span style={{fontSize:10,color:"#6a8a6a"}}>(20kg 미만)</span></div>
+              ? <div style={{ fontSize:13, color:"#6b5b3a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원 <span style={{fontSize:10,color:"#9a8a6a"}}>(20kg 미만)</span></div>
               : totalQty>=20 ? <div style={{ fontSize:13, color:"#059669", marginBottom:6 }}>✓ 배송비 무료 ({totalQty}kg)</div> : null
             }
-            <div style={{ fontSize:18, fontWeight:900, color:"#1a4a2e", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
+            <div style={{ fontSize:18, fontWeight:900, color:"#8b6914", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
             {payMethod === "account" ? (
               <>
-                <div style={{ fontSize:12, color:"#4a3a2a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#faf8f4", border:"1px solid #e0d5b8" }}>
+                <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
                   *계좌번호 1006-901-483313 우리은행 블레스빈
                 </div>
-                <div style={{ fontSize:12, color:"#4a3a2a", lineHeight:2.2 }}>
+                <div style={{ fontSize:12, color:"#6b5b3a", lineHeight:2.2 }}>
                   <div>* 14시 전 입금시 당일출고</div><div>* 입금 확인문자 부탁드립니다</div>
                 </div>
               </>
@@ -454,8 +454,8 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
       ) : (
         /* 물류팀 오더방용 미리보기 */
         <div style={{ padding:"20px", fontFamily:"monospace" }}>
-          <div style={{ fontSize:12, color:"#6a8a6a", marginBottom:10 }}>물류팀 오더방에 전달할 내용입니다.</div>
-          <div style={{ background:"#faf8f4", borderRadius:10, padding:"16px", border:"1px solid #e0d5b8", lineHeight:2, fontSize:13, color:"#1a1a18", whiteSpace:"pre-wrap" }}>
+          <div style={{ fontSize:12, color:"#9a8a6a", marginBottom:10 }}>물류팀 오더방에 전달할 내용입니다.</div>
+          <div style={{ background:"#f5f0e8", borderRadius:10, padding:"16px", border:"1px solid #e0d5b8", lineHeight:2, fontSize:13, color:"#1a1208", whiteSpace:"pre-wrap" }}>
             {displayName}{"\n"}
             {"\n"}
             {items.map(it => {
@@ -487,26 +487,26 @@ function ClientSearch({ clients, selClient, onSelect, manualGroup, onManualGroup
 
   return (
     <div style={{ marginBottom:14 }}>
-      <label style={{ display:"block", fontSize:11, color:"#4a3a2a", marginBottom:7, fontWeight:600 }}>거래처명</label>
+      <label style={{ display:"block", fontSize:11, color:"#6b5b3a", marginBottom:7, fontWeight:600 }}>거래처명</label>
       <div style={{ position:"relative" }}>
         <input value={query}
           onChange={e=>{ setQuery(e.target.value); if(selClient&&e.target.value!==selClient.name) onSelect(null); }}
           onFocus={()=>setFocused(true)} onBlur={()=>setTimeout(()=>setFocused(false),180)}
           placeholder="거래처명 입력 (예: 카페 온기)"
-          style={{ width:"100%", padding:"11px 38px 11px 12px", borderRadius:10, boxSizing:"border-box", background:"#fff", border:`1px solid ${selClient?G.color+"88":"rgba(26,74,46,0.2)"}`, color:"#1a1a18", fontSize:13, outline:"none" }} />
+          style={{ width:"100%", padding:"11px 38px 11px 12px", borderRadius:10, boxSizing:"border-box", background:"#fff", border:`1px solid ${selClient?G.color+"88":"rgba(212,175,55,0.2)"}`, color:"#1a1208", fontSize:13, outline:"none" }} />
         {selClient
-          ? <button onClick={()=>{onSelect(null);setQuery("");}} style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#4a3a2a",fontSize:14,cursor:"pointer" }}>✕</button>
-          : query && <span style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"#4a3a2a" }}>🔍</span>
+          ? <button onClick={()=>{onSelect(null);setQuery("");}} style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"transparent",border:"none",color:"#6b5b3a",fontSize:14,cursor:"pointer" }}>✕</button>
+          : query && <span style={{ position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"#6b5b3a" }}>🔍</span>
         }
         {focused && (
-          <div style={{ position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:200,background:"#f0f5f0",border:"1px solid rgba(212,175,55,0.25)",borderRadius:12,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto" }}>
+          <div style={{ position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:200,background:"#ede8da",border:"1px solid rgba(212,175,55,0.25)",borderRadius:12,overflow:"hidden",boxShadow:"0 8px 24px rgba(0,0,0,0.5)",maxHeight:220,overflowY:"auto" }}>
             {suggestions.length===0
-              ? <div style={{ padding:"14px",fontSize:12,color:"#4a3a2a" }}>일치하는 거래처 없음 — 거래처 탭에서 추가하세요</div>
+              ? <div style={{ padding:"14px",fontSize:12,color:"#6b5b3a" }}>일치하는 거래처 없음 — 거래처 탭에서 추가하세요</div>
               : suggestions.map(c=>{ const g=GROUPS[c.group]; return (
                 <div key={c.id} onMouseDown={()=>{onSelect(c);setQuery(c.name);setFocused(false);}}
                   style={{ padding:"11px 14px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #fff" }}
                   onMouseOver={e=>e.currentTarget.style.background=g.bg} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
-                  <span style={{ fontWeight:600,fontSize:13,color:"#1a1a18" }}>{c.name}</span>
+                  <span style={{ fontWeight:600,fontSize:13,color:"#1a1208" }}>{c.name}</span>
                   <span style={{ padding:"2px 9px",borderRadius:8,fontSize:10,fontWeight:700,background:g.bg,color:g.color,border:`1px solid ${g.color}44` }}>{g.label}</span>
                 </div>
               );})
@@ -517,14 +517,14 @@ function ClientSearch({ clients, selClient, onSelect, manualGroup, onManualGroup
       {selClient
         ? <div style={{ marginTop:8,padding:"8px 12px",borderRadius:9,background:G.bg,border:`1px solid ${G.color}44`,display:"flex",alignItems:"center",gap:8 }}>
             <span style={{ fontSize:12,color:G.color,fontWeight:700 }}>✓ {G.label} 단가 자동 적용</span>
-            <span style={{ fontSize:11,color:"#4a3a2a" }}>— {selClient.name}</span>
+            <span style={{ fontSize:11,color:"#6b5b3a" }}>— {selClient.name}</span>
           </div>
         : <div style={{ marginTop:10 }}>
-            <div style={{ fontSize:10,color:"#4a3a2a",marginBottom:7 }}>등록되지 않은 거래처 — 단가 그룹을 직접 선택하세요</div>
+            <div style={{ fontSize:10,color:"#6b5b3a",marginBottom:7 }}>등록되지 않은 거래처 — 단가 그룹을 직접 선택하세요</div>
             <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:6 }}>
               {GROUP_KEYS.map(k=>{ const g=GROUPS[k]; return (
                 <button key={k} onClick={()=>onManualGroup(k)} style={{ padding:"8px 4px",borderRadius:9,border:`1px solid ${manualGroup===k?g.color:"rgba(0,0,0,0.05)"}`,background:manualGroup===k?g.bg:"transparent",cursor:"pointer" }}>
-                  <div style={{ fontWeight:700,fontSize:12,color:manualGroup===k?g.color:"#4a3a2a" }}>{g.label}</div>
+                  <div style={{ fontWeight:700,fontSize:12,color:manualGroup===k?g.color:"#6b5b3a" }}>{g.label}</div>
                 </button>
               );})}
             </div>
@@ -542,34 +542,34 @@ function ClientModal({ initial, clients, onClose, onSave }) {
   const dup = !initial && clients.some(c=>c.phone.replace(/\D/g,"")=== phone.replace(/\D/g,"")&&phone.trim());
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
-      <div style={{ background:"#f0f5f0",borderRadius:18,border:"1px solid rgba(212,175,55,0.3)",padding:24,width:"100%",maxWidth:380 }}>
-        <div style={{ fontWeight:800,fontSize:16,color:"#c41230",marginBottom:20 }}>{initial?"거래처 수정":"거래처 등록"}</div>
+      <div style={{ background:"#ede8da",borderRadius:18,border:"1px solid rgba(212,175,55,0.3)",padding:24,width:"100%",maxWidth:380 }}>
+        <div style={{ fontWeight:800,fontSize:16,color:"#b8860b",marginBottom:20 }}>{initial?"거래처 수정":"거래처 등록"}</div>
         <label style={ms.label}>매장명 *</label>
         <input value={name} onChange={e=>setName(e.target.value)} placeholder="카페 예시" style={{...ms.input,marginBottom:12}} />
         <label style={ms.label}>전화번호</label>
-        <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" style={{...ms.input,marginBottom:dup?4:14,borderColor:dup?"rgba(255,80,80,0.5)":"rgba(26,74,46,0.2)"}} />
+        <input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="010-0000-0000" style={{...ms.input,marginBottom:dup?4:14,borderColor:dup?"rgba(255,80,80,0.5)":"rgba(212,175,55,0.2)"}} />
         {dup&&<div style={{fontSize:11,color:"#ff8a8a",marginBottom:10}}>⚠️ 이미 등록된 번호입니다</div>}
         <label style={ms.label}>단가 그룹</label>
         <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:20 }}>
           {Object.entries(GROUPS).map(([k,g])=>(
             <button key={k} onClick={()=>setGroup(k)} style={{ padding:"10px 6px",borderRadius:10,border:`1px solid ${group===k?g.color:"rgba(0,0,0,0.05)"}`,background:group===k?g.bg:"transparent",cursor:"pointer" }}>
-              <div style={{ fontWeight:700,fontSize:13,color:group===k?g.color:"#4a3a2a" }}>{g.label}</div>
+              <div style={{ fontWeight:700,fontSize:13,color:group===k?g.color:"#6b5b3a" }}>{g.label}</div>
             </button>
           ))}
         </div>
         <div style={{ display:"flex",gap:8 }}>
-          <button onClick={onClose} style={{ flex:1,padding:"12px",borderRadius:10,border:"1px solid #f0ead8",background:"transparent",color:"#4a3a2a",cursor:"pointer",fontWeight:700 }}>취소</button>
+          <button onClick={onClose} style={{ flex:1,padding:"12px",borderRadius:10,border:"1px solid #f0ead8",background:"transparent",color:"#6b5b3a",cursor:"pointer",fontWeight:700 }}>취소</button>
           <button onClick={()=>{ if(!name.trim()||dup) return; onSave({id:initial?.id||genId(),name:name.trim(),phone:phone.trim(),group}); onClose(); }}
             disabled={!name.trim()||dup}
-            style={{ flex:2,padding:"12px",borderRadius:10,border:"none",background:name.trim()&&!dup?"linear-gradient(135deg,#c41230,#8b0f22)":"#fff",color:name.trim()&&!dup?"#faf8f4":"#6a8a6a",cursor:name.trim()&&!dup?"pointer":"not-allowed",fontWeight:800,fontSize:14 }}>저장</button>
+            style={{ flex:2,padding:"12px",borderRadius:10,border:"none",background:name.trim()&&!dup?"linear-gradient(135deg,#d4af37,#8b6914)":"#fff",color:name.trim()&&!dup?"#f5f0e8":"#9a8a6a",cursor:name.trim()&&!dup?"pointer":"not-allowed",fontWeight:800,fontSize:14 }}>저장</button>
         </div>
       </div>
     </div>
   );
 }
 const ms = {
-  label:{ display:"block",fontSize:12,color:"#4a3a2a",marginBottom:7,fontWeight:600 },
-  input:{ width:"100%",padding:"10px 12px",borderRadius:9,background:"#fff",border:"1px solid rgba(26,74,46,0.2)",color:"#1a1a18",fontSize:14,outline:"none",boxSizing:"border-box" },
+  label:{ display:"block",fontSize:12,color:"#6b5b3a",marginBottom:7,fontWeight:600 },
+  input:{ width:"100%",padding:"10px 12px",borderRadius:9,background:"#fff",border:"1px solid rgba(212,175,55,0.2)",color:"#1a1208",fontSize:14,outline:"none",boxSizing:"border-box" },
 };
 
 // ── 단가 수정 모달 ────────────────────────────────────────────────────────
@@ -578,9 +578,9 @@ function PriceEditModal({ product, onClose, onSave }) {
   const [stock, setStock]   = useState(product.stock);
   return (
     <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20 }}>
-      <div style={{ background:"#f0f5f0",borderRadius:18,border:"1px solid rgba(212,175,55,0.3)",padding:24,width:"100%",maxWidth:380 }}>
-        <div style={{ fontWeight:800,fontSize:15,color:"#c41230",marginBottom:4 }}>단가 수정</div>
-        <div style={{ fontSize:12,color:"#4a3a2a",marginBottom:18 }}>{product.name}</div>
+      <div style={{ background:"#ede8da",borderRadius:18,border:"1px solid rgba(212,175,55,0.3)",padding:24,width:"100%",maxWidth:380 }}>
+        <div style={{ fontWeight:800,fontSize:15,color:"#b8860b",marginBottom:4 }}>단가 수정</div>
+        <div style={{ fontSize:12,color:"#6b5b3a",marginBottom:18 }}>{product.name}</div>
         {GROUP_KEYS.map(k=>{ const g=GROUPS[k]; return (
           <div key={k} style={{ marginBottom:12 }}>
             <label style={{ display:"block",fontSize:12,marginBottom:5,fontWeight:700,color:g.color }}>{g.label} 단가 (원/kg)</label>
@@ -589,14 +589,14 @@ function PriceEditModal({ product, onClose, onSave }) {
           </div>
         );})}
         <div style={{ marginBottom:18 }}>
-          <label style={{ display:"block",fontSize:12,marginBottom:5,fontWeight:600,color:"#4a3a2a" }}>재고 (kg)</label>
+          <label style={{ display:"block",fontSize:12,marginBottom:5,fontWeight:600,color:"#6b5b3a" }}>재고 (kg)</label>
           <input type="number" value={stock} onChange={e=>setStock(Number(e.target.value))}
-            style={{ width:"100%",padding:"9px 12px",borderRadius:9,background:"#fff",border:"1px solid #e8e0cc",color:"#1a1a18",fontSize:14,outline:"none",boxSizing:"border-box" }} />
+            style={{ width:"100%",padding:"9px 12px",borderRadius:9,background:"#fff",border:"1px solid #e8e0cc",color:"#1a1208",fontSize:14,outline:"none",boxSizing:"border-box" }} />
         </div>
         <div style={{ display:"flex",gap:8 }}>
-          <button onClick={onClose} style={{ flex:1,padding:"12px",borderRadius:10,border:"1px solid #f0ead8",background:"transparent",color:"#4a3a2a",cursor:"pointer",fontWeight:700 }}>취소</button>
+          <button onClick={onClose} style={{ flex:1,padding:"12px",borderRadius:10,border:"1px solid #f0ead8",background:"transparent",color:"#6b5b3a",cursor:"pointer",fontWeight:700 }}>취소</button>
           <button onClick={()=>{ onSave({...product,prices,stock}); onClose(); }}
-            style={{ flex:2,padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#c41230,#8b0f22)",color:"#fff",cursor:"pointer",fontWeight:800,fontSize:14 }}>저장</button>
+            style={{ flex:2,padding:"12px",borderRadius:10,border:"none",background:"linear-gradient(135deg,#d4af37,#8b6914)",color:"#fff",cursor:"pointer",fontWeight:800,fontSize:14 }}>저장</button>
         </div>
       </div>
     </div>
@@ -606,7 +606,7 @@ function PriceEditModal({ product, onClose, onSave }) {
 // ── 최근 발주 내역 카드 ───────────────────────────────────────────────────
 function HistoryList({ history, onLoad, onDelete }) {
   if (history.length === 0) return (
-    <div style={{ padding:"20px", textAlign:"center", color:"#6a8a6a", fontSize:12, background:"rgba(0,0,0,0.02)", borderRadius:12, border:"1px dashed #f9f6ef" }}>
+    <div style={{ padding:"20px", textAlign:"center", color:"#9a8a6a", fontSize:12, background:"rgba(0,0,0,0.02)", borderRadius:12, border:"1px dashed #f9f6ef" }}>
       아직 발주 내역이 없습니다
     </div>
   );
@@ -619,7 +619,7 @@ function HistoryList({ history, onLoad, onDelete }) {
           <div key={h.id} style={{
             display:"flex", alignItems:"stretch",
             borderRadius:11, border:`1px solid ${g.color}33`, overflow:"hidden",
-            background:"#ffffff",
+            background:"#fffdf7",
           }}>
             {/* 클릭 영역 */}
             <button onClick={()=>onLoad(h)} style={{
@@ -631,17 +631,17 @@ function HistoryList({ history, onLoad, onDelete }) {
             >
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-                  <span style={{ fontSize:13, fontWeight:700, color:"#1a1a18" }}>
+                  <span style={{ fontSize:13, fontWeight:700, color:"#1a1208" }}>
                     {h.clientName || h.senderName || "발신자 미상"}
                   </span>
                   <span style={{ padding:"1px 7px", borderRadius:7, fontSize:10, fontWeight:700, background:g.bg, color:g.color }}>{g.label}</span>
                 </div>
-                <span style={{ fontSize:10, color:"#6a8a6a" }}>{fmtDate(h.ts)}</span>
+                <span style={{ fontSize:10, color:"#9a8a6a" }}>{fmtDate(h.ts)}</span>
               </div>
-              <div style={{ fontSize:11, color:"#4a3a2a" }}>
+              <div style={{ fontSize:11, color:"#6b5b3a" }}>
                 {(h.items||[]).slice(0,3).map(it=>it.product_name||it.matched?.name).filter(Boolean).join(" · ")}
                 {(h.items||[]).length > 3 && ` 외 ${h.items.length-3}건`}
-                {totalQty > 0 && <span style={{ marginLeft:8, color:"#6a8a6a" }}>{totalQty}kg</span>}
+                {totalQty > 0 && <span style={{ marginLeft:8, color:"#9a8a6a" }}>{totalQty}kg</span>}
               </div>
             </button>
             {/* 삭제 버튼 */}
@@ -906,8 +906,8 @@ function ProductSearch({ priceList, selected, group, onSelect, placeholder="품�
         placeholder={placeholder}
         style={{
           width:"100%", padding:"8px 10px", borderRadius:8, boxSizing:"border-box",
-          background:"#fff", border:`1px solid ${selected ? G.color+"88" : "#e0d4cc"}`,
-          color:"#1a1a18", fontSize:12, outline:"none",
+          background:"#fff", border:`1px solid ${selected ? G.color+"88" : "#d4c49a"}`,
+          color:"#1a1208", fontSize:12, outline:"none",
         }}
       />
 
@@ -915,11 +915,11 @@ function ProductSearch({ priceList, selected, group, onSelect, placeholder="품�
       {focused && query.trim().length > 0 && (
         <div style={{
           position:"absolute", top:"calc(100% + 3px)", left:0, right:0, zIndex:300,
-          background:"#ffffff", border:"1px solid #d4c49a", borderRadius:10,
+          background:"#fffdf7", border:"1px solid #d4c49a", borderRadius:10,
           boxShadow:"0 6px 20px rgba(0,0,0,0.12)", maxHeight:240, overflowY:"auto",
         }}>
           {suggestions.length === 0 ? (
-            <div style={{ padding:"12px 14px", fontSize:12, color:"#6a8a6a" }}>
+            <div style={{ padding:"12px 14px", fontSize:12, color:"#9a8a6a" }}>
               일치하는 품목 없음
             </div>
           ) : suggestions.map(p => {
@@ -933,10 +933,10 @@ function ProductSearch({ priceList, selected, group, onSelect, placeholder="품�
                 onMouseOver={e => e.currentTarget.style.background = G.bg}
                 onMouseOut={e => e.currentTarget.style.background = selected?.id===p.id ? G.bg : "transparent"}
               >
-                <div style={{ fontSize:12, fontWeight:600, color:"#1a1a18" }}>{p.name}</div>
+                <div style={{ fontSize:12, fontWeight:600, color:"#1a1208" }}>{p.name}</div>
                 <div style={{ fontSize:11, color:G.color, fontWeight:700, marginTop:2 }}>
                   {G.label} {pr.toLocaleString()}원/kg
-                  {p.stock > 0 && <span style={{ color:"#6a8a6a", fontWeight:400, marginLeft:8 }}>재고 {p.stock}kg</span>}
+                  {p.stock > 0 && <span style={{ color:"#9a8a6a", fontWeight:400, marginLeft:8 }}>재고 {p.stock}kg</span>}
                 </div>
               </div>
             );
@@ -1023,15 +1023,15 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
   }
 
   const zone = (label, sub, ref, type, stat) => (
-    <div style={{ padding:"18px", borderRadius:14, border:"1px solid #e0d5b8", background:"#ffffff", marginBottom:14 }}>
-      <div style={{ fontWeight:700, color:"#1a4a2e", fontSize:14, marginBottom:3 }}>{label}</div>
-      <div style={{ fontSize:11, color:"#4a3a2a", marginBottom:12, lineHeight:1.6 }}>{sub}</div>
+    <div style={{ padding:"18px", borderRadius:14, border:"1px solid #e0d5b8", background:"#fffdf7", marginBottom:14 }}>
+      <div style={{ fontWeight:700, color:"#8b6914", fontSize:14, marginBottom:3 }}>{label}</div>
+      <div style={{ fontSize:11, color:"#6b5b3a", marginBottom:12, lineHeight:1.6 }}>{sub}</div>
       <input ref={ref} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
         onChange={e=>{ if(e.target.files[0]) handleFile(e.target.files[0], type); e.target.value=""; }} />
       <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
         <button onClick={()=>ref.current?.click()} style={{
           padding:"9px 16px", borderRadius:9, border:"none",
-          background:"#c41230", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:700
+          background:"#b8860b", color:"#fff", fontSize:13, cursor:"pointer", fontWeight:700
         }}>파일 선택</button>
         {stat && <span style={{ fontSize:12, fontWeight:600,
           color: stat.startsWith("✅") ? "#059669" : stat.startsWith("⏳") ? "#2563eb" : "#dc2626"
@@ -1042,8 +1042,8 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
 
   return (
     <div>
-      <h2 style={{ fontSize:18, fontWeight:800, color:"#1a4a2e", margin:"0 0 6px" }}>데이터 업로드</h2>
-      <p style={{ fontSize:12, color:"#4a3a2a", margin:"0 0 18px", lineHeight:1.7 }}>
+      <h2 style={{ fontSize:18, fontWeight:800, color:"#8b6914", margin:"0 0 6px" }}>데이터 업로드</h2>
+      <p style={{ fontSize:12, color:"#6b5b3a", margin:"0 0 18px", lineHeight:1.7 }}>
         엑셀(.xlsx) 또는 CSV 파일로 업로드하세요. 업로드 즉시 앱에 반영됩니다.
       </p>
 
@@ -1058,14 +1058,14 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
           <div style={{ maxHeight:150, overflowY:"auto" }}>
             {Object.entries(stockMap).slice(0, 10).map(([code, entry], i) => (
               <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:11, padding:"3px 0", borderBottom:"1px solid #dcfce7" }}>
-                <span style={{ color:"#4a3a2a", fontFamily:"monospace", fontSize:10 }}>{code}</span>
+                <span style={{ color:"#6b5b3a", fontFamily:"monospace", fontSize:10 }}>{code}</span>
                 <span style={{ fontWeight:700, color: !entry.available ? "#dc2626" : entry.stock < 20 ? "#d97706" : "#059669" }}>
                   {!entry.available ? "품절" : `${entry.stock}kg`}
                 </span>
               </div>
             ))}
             {Object.keys(stockMap).length > 10 && (
-              <div style={{ fontSize:10, color:"#6a8a6a", marginTop:4 }}>외 {Object.keys(stockMap).length - 10}개...</div>
+              <div style={{ fontSize:10, color:"#9a8a6a", marginTop:4 }}>외 {Object.keys(stockMap).length - 10}개...</div>
             )}
           </div>
           <button onClick={() => { setStockMap({}); setStatus(s=>({...s, stock:null})); }}
@@ -1077,26 +1077,26 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
       {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices)}
       {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients)}
 
-      <div style={{ padding:"14px", borderRadius:12, background:"#faf8f4", border:"1px solid #e0d5b8" }}>
-        <div style={{ fontWeight:700, color:"#4a3a2a", fontSize:12, marginBottom:10 }}>📋 엑셀 양식 예시</div>
+      <div style={{ padding:"14px", borderRadius:12, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
+        <div style={{ fontWeight:700, color:"#6b5b3a", fontSize:12, marginBottom:10 }}>📋 엑셀 양식 예시</div>
         <div style={{ marginBottom:10 }}>
-          <div style={{ fontSize:10, color:"#4a3a2a", marginBottom:5, fontWeight:600 }}>재고표</div>
-          <div style={{ fontFamily:"monospace", fontSize:10, color:"#4a3a2a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>재고표</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
             품목명 | ... | 판매가능수량<br/>
             ET 예가체프 G1 | ... | 120<br/>
             BR 세하도 NY2 | ... | 85
           </div>
         </div>
         <div style={{ marginBottom:10 }}>
-          <div style={{ fontSize:10, color:"#4a3a2a", marginBottom:5, fontWeight:600 }}>단가표</div>
-          <div style={{ fontFamily:"monospace", fontSize:10, color:"#4a3a2a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>단가표</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
             품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | 재고<br/>
             ET 예가체프 G1 | 22000 | 19500 | 18500 | 17000 | 120
           </div>
         </div>
         <div>
-          <div style={{ fontSize:10, color:"#4a3a2a", marginBottom:5, fontWeight:600 }}>거래처</div>
-          <div style={{ fontFamily:"monospace", fontSize:10, color:"#4a3a2a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
+          <div style={{ fontSize:10, color:"#6b5b3a", marginBottom:5, fontWeight:600 }}>거래처</div>
+          <div style={{ fontFamily:"monospace", fontSize:10, color:"#6b5b3a", background:"#fff", padding:"8px 10px", borderRadius:7, overflowX:"auto" }}>
             거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원<br/>
             스홀리 | 홍길동 | 010-3333-7777 | COE | 전진혁
           </div>
@@ -1120,8 +1120,20 @@ function saveToStorage(key, value) {
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]               = useState("order");
-  const [priceList, setPriceList]   = useState(INIT_PRICE_LIST);
-  const [clients, setClients]       = useState(INIT_CLIENTS);
+  // priceList — 업로드 시 localStorage에 저장, 새로고침 후에도 유지
+  const [priceList, setPriceListState] = useState(() => loadFromStorage("bb_pricelist", INIT_PRICE_LIST));
+  function setPriceList(value) {
+    const next = typeof value === "function" ? value(priceList) : value;
+    saveToStorage("bb_pricelist", next);
+    setPriceListState(next);
+  }
+  // clients — 업로드 시 localStorage에 저장, 새로고침 후에도 유지
+  const [clients, setClientsState] = useState(() => loadFromStorage("bb_clients", INIT_CLIENTS));
+  function setClients(value) {
+    const next = typeof value === "function" ? value(clients) : value;
+    saveToStorage("bb_clients", next);
+    setClientsState(next);
+  }
   // 발주 이력 — localStorage에서 초기값 로드
   const [history, setHistoryState]  = useState(() => loadFromStorage("bb_history", []));
   const [stockMap, setStockMapState] = useState(() => loadFromStorage("bb_stockmap", {}));
@@ -1173,49 +1185,14 @@ export default function App() {
   // 단가표 탭
   const [pgFilter, setPgFilter] = useState("SPECIAL");
   const [pSearch, setPSearch]   = useState("");
-  const [pStockFilter, setPStockFilter] = useState("all"); // all | in | out
-  const [pCountry, setPCountry]   = useState("all");
 
   const orderDate   = new Date().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric"});
   const activeGroup = selClient?.group || manualGroup;
   const G           = GROUPS[activeGroup];
 
-  // 국가 코드 매핑
-  const COUNTRY_MAP = {
-    DC:"디카페인",BR:"브라질",CO:"콜롬비아",ET:"에티오피아",GT:"과테말라",
-    MX:"멕시코",SV:"엘살바도르",HN:"온두라스",JM:"자메이카",CR:"코스타리카",
-    PA:"파나마",PE:"페루",RW:"르완다",YE:"예멘",UG:"우간다",KE:"케냐",
-    TN:"탄자니아",VN:"베트남",IN:"인도",ID:"인도네시아",PG:"파푸아뉴기니",HI:"하와이"
-  };
-  // 품목코드 앞 2자리로 국가코드 추출
-  function getCountryCode(id) { return (id||"").split("-")[0] || "?"; }
-
-  const filteredPrices = priceList.filter(p => {
-    if (pSearch && !p.name.includes(pSearch) && !p.id.includes(pSearch)) return false;
-    const stockEntry = stockMap[p.id];
-    const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? 0);
-    const hasStock = stockQty > 0;
-    if (pStockFilter === "in" && !hasStock) return false;
-    if (pStockFilter === "out" && hasStock) return false;
-    if (pCountry !== "all" && getCountryCode(p.id) !== pCountry) return false;
-    return true;
-  });
-
-  // 국가별 통계 (재고 있는 품목 수 포함)
-  const countryStats = {};
-  for (const p of priceList) {
-    const cc = getCountryCode(p.id);
-    const sq = stockMap[p.id] ? stockMap[p.id].stock : (p.stock ?? 0);
-    if (!countryStats[cc]) countryStats[cc] = { total:0, inStock:0 };
-    countryStats[cc].total++;
-    if (sq > 0) countryStats[cc].inStock++;
-  }
-  const countryOrder = Object.entries(countryStats)
-    .sort((a,b) => b[1].total - a[1].total)
-    .map(([cc]) => cc);
-
-  const inStockCount  = priceList.filter(p => { const s = stockMap[p.id]; return s ? s.stock > 0 : (p.stock??0)>0; }).length;
-  const outStockCount = priceList.length - inStockCount;
+  const filteredPrices = priceList.filter(p =>
+    p.name.includes(pSearch)||p.origin.includes(pSearch)||p.process.includes(pSearch)
+  );
 
   function mapItems(raw) {
     return (raw||[]).map(it => {
@@ -1394,56 +1371,42 @@ export default function App() {
 
       {/* 헤더 */}
       <header style={S.header}>
-        {/* 로고 영역 */}
-        <div style={{ display:"flex", alignItems:"center", gap:7, flexShrink:0 }}>
-          <img
-            src="https://www.blessbean.co.kr/data/apms/seo/logo1_250515115319.png"
-            alt="BLESS BEAN"
-            style={{ height:32, objectFit:"contain", display:"block" }}
-            onError={e => {
-              e.target.style.display = "none";
-              e.target.nextSibling.style.display = "flex";
-            }}
-          />
-          {/* 폴백 로고 */}
-          <div style={{ display:"none", alignItems:"center", gap:6 }}>
-            <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
-              <rect width="30" height="30" rx="3" fill="#c41230"/>
-              <text x="15" y="21" textAnchor="middle" fill="white" fontSize="17" fontWeight="900" fontFamily="Georgia,serif">B</text>
-            </svg>
-            <div style={{ lineHeight:1 }}>
-              <div style={{ fontWeight:900, fontSize:13, letterSpacing:"0.08em" }}>
-                <span style={{ color:"#c41230" }}>BLESS</span><span style={{ color:"#1a4a2e" }}> BEAN</span>
-              </div>
-              <div style={{ fontSize:8, color:"#8a7a6a", letterSpacing:"0.06em", marginTop:2 }}>Specialty Coffee</div>
+        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
+          <div style={S.logo}>☕</div>
+          <div>
+            <div style={{ fontWeight:800,fontSize:14,color:"#8b6914",letterSpacing:"0.05em" }}>BLESSBEAN</div>
+            <div style={{ display:"flex",alignItems:"center",gap:5 }}>
+              <div style={{ fontSize:9,color:"#9a8a6a",letterSpacing:"0.08em" }}>발주 자동화 시스템</div>
+              {/* DB 연결 상태 표시 */}
+              <button onClick={async () => {
+                if (!DB_ENABLED) { alert("DB_ENABLED=false\nVITE 환경변수가 앱에 로드되지 않았습니다."); return; }
+                try {
+                  const res = await fetch("/api/db", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ action: "test" })
+                  });
+                  const json = await res.json();
+                  if (!res.ok || json.error) alert("❌ DB 연결 실패\n" + JSON.stringify(json.error, null, 2));
+                  else alert("✅ DB 연결 성공");
+                } catch(e) { alert("❌ 오류\n" + e.message); }
+              }} style={{
+                fontSize:9, padding:"1px 5px", borderRadius:4, border:"none", cursor:"pointer",
+                background: DB_ENABLED ? "#dcfce7" : "#fee2e2",
+                color: DB_ENABLED ? "#166534" : "#991b1b",
+              }}>
+                {DB_ENABLED ? "DB●" : "DB○"}
+              </button>
             </div>
           </div>
-          {/* DB 버튼 - 로고 바로 옆에 작게 */}
-          <button onClick={async () => {
-            if (!DB_ENABLED) { alert("DB_ENABLED=false"); return; }
-            try {
-              const res = await fetch("/api/db", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"test"}) });
-              const json = await res.json();
-              if (!res.ok || json.error) alert("❌ DB 연결 실패\n" + JSON.stringify(json.error,null,2));
-              else alert("✅ DB 연결 성공");
-            } catch(e) { alert("❌ 오류\n" + e.message); }
-          }} style={{
-            fontSize:9, padding:"2px 5px", borderRadius:3, border:"none", cursor:"pointer",
-            background: DB_ENABLED ? "#e8f4ed" : "#fee2e2",
-            color: DB_ENABLED ? "#1a4a2e" : "#991b1b",
-            fontWeight:700, flexShrink:0,
-          }}>
-            {DB_ENABLED ? "DB●" : "DB○"}
-          </button>
         </div>
-        {/* 탭 네비게이션 */}
-        <div style={{ display:"flex", gap:2, flexShrink:0 }}>
+        <div style={{ display:"flex",gap:4 }}>
           {[["order","발주"],["pricelist","단가표"],["clients","거래처"],["upload","업로드"]].map(([t,l])=>(
             <button key={t} onClick={()=>setTab(t)} style={{
-              padding:"6px 10px", borderRadius:7, fontSize:12, cursor:"pointer",
-              border: tab===t ? "1.5px solid #c41230" : "1.5px solid #ece4dc",
-              background: tab===t ? "#c41230" : "transparent",
-              color: tab===t ? "#fff" : "#5a4a3a",
+              padding:"6px 10px", borderRadius:8, fontSize:12, cursor:"pointer",
+              border: tab===t ? "1.5px solid #b8860b" : "1.5px solid #e0d5b8",
+              background: tab===t ? "#b8860b" : "#fff",
+              color: tab===t ? "#fff" : "#6b5b3a",
               fontWeight: tab===t ? 700 : 500,
               whiteSpace: "nowrap",
               transition: "all 0.15s",
@@ -1460,110 +1423,41 @@ export default function App() {
         {/* ══ 단가표 탭 ══ */}
         {tab==="pricelist" && (
           <div>
-            {/* 제목 */}
-            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12 }}>
-              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#c41230" }}>단가표</h2>
-              <span style={{ fontSize:11,color:"#8a7a6a" }}>✏️ 카드 클릭 → 수정</span>
+            <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14 }}>
+              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#b8860b" }}>단가표 관리</h2>
+              <div style={{ fontSize:11,color:"#6b5b3a" }}>✏️ 클릭 → 단가/재고 수정</div>
             </div>
-
-            {/* 검색 */}
-            <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="품목 검색..." style={{...S.input,width:"100%",marginBottom:8,padding:"8px 11px",fontSize:12}} />
-
-            {/* 재고 필터 */}
-            <div style={{ display:"flex",gap:5,marginBottom:8 }}>
-              {[
-                ["all", `전체 ${priceList.length}`],
-                ["in",  `재고있음 ${inStockCount}`, "#e8f4ed", "#1a4a2e", "#6abf8a"],
-                ["out", `품절 ${outStockCount}`, "#f5f0eb", "#8a7a6a", "#e0d4cc"],
-              ].map(([v,label,bg,tc,bc])=>(
-                <button key={v} onClick={()=>setPStockFilter(v)} style={{
-                  flex:1, padding:"6px 4px", borderRadius:9, fontSize:11, fontWeight:600,
-                  border: pStockFilter===v ? `1.5px solid ${bc||"#c41230"}` : "1px solid #ece4dc",
-                  background: pStockFilter===v ? (bg||"#c41230") : "transparent",
-                  color: pStockFilter===v ? (tc||"#fff") : "#5a4a3a",
-                  cursor:"pointer", whiteSpace:"nowrap",
-                }}>{label}</button>
-              ))}
-            </div>
-
-            {/* 단가그룹 필터 */}
-            <div style={{ display:"flex",gap:4,marginBottom:8,flexWrap:"wrap" }}>
+            <div style={{ display:"flex",gap:6,marginBottom:12,flexWrap:"wrap" }}>
+              <input value={pSearch} onChange={e=>setPSearch(e.target.value)} placeholder="검색" style={{...S.input,flex:1,minWidth:100,padding:"7px 11px",fontSize:12}} />
               {GROUP_KEYS.map(k=>{ const g=GROUPS[k]; return (
-                <button key={k} onClick={()=>setPgFilter(k)} style={{
-                  padding:"4px 9px", borderRadius:8, fontSize:11,
-                  border:`1px solid ${pgFilter===k?g.color:"rgba(0,0,0,0.05)"}`,
-                  background:pgFilter===k?g.bg:"transparent",
-                  color:pgFilter===k?g.color:"#5a4a3a",
-                  fontWeight:pgFilter===k?700:400, cursor:"pointer"
-                }}>{g.label}</button>
+                <button key={k} onClick={()=>setPgFilter(k)} style={{ padding:"5px 10px",borderRadius:9,border:`1px solid ${pgFilter===k?g.color:"rgba(0,0,0,0.05)"}`,background:pgFilter===k?g.bg:"transparent",color:pgFilter===k?g.color:"#6b5b3a",fontSize:11,fontWeight:pgFilter===k?700:400,cursor:"pointer" }}>{g.label}</button>
               );})}
             </div>
-
-            {/* 국가 필터 (가로 스크롤) */}
-            <div style={{ display:"flex",gap:4,marginBottom:10,overflowX:"auto",paddingBottom:4,scrollbarWidth:"none" }}>
-              <button onClick={()=>setPCountry("all")} style={{
-                flexShrink:0, padding:"3px 9px", borderRadius:20, fontSize:11,
-                border: pCountry==="all" ? "1.5px solid #1a4a2e" : "1px solid #ece4dc",
-                background: pCountry==="all" ? "#1a4a2e" : "transparent",
-                color: pCountry==="all" ? "#fff" : "#5a4a3a", cursor:"pointer"
-              }}>전체국가</button>
-              {countryOrder.map(cc=>{
-                const s = countryStats[cc]; if(!s) return null;
-                const isActive = pCountry===cc;
-                return (
-                  <button key={cc} onClick={()=>setPCountry(cc)} style={{
-                    flexShrink:0, padding:"3px 9px", borderRadius:20, fontSize:11,
-                    border: isActive ? "1.5px solid #1a4a2e" : "1px solid #ece4dc",
-                    background: isActive ? "#1a4a2e" : "transparent",
-                    color: isActive ? "#fff" : "#5a4a3a", cursor:"pointer",
-                  }}>{COUNTRY_MAP[cc]||cc} {s.inStock>0?<span style={{color:isActive?"#aedba4":"#2f9e44",fontWeight:700}}>{s.inStock}</span>:""}/{s.total}</button>
-                );
-              })}
-            </div>
-
-            {/* 품목 카드 목록 */}
-            <div style={{ display:"flex",flexDirection:"column",gap:5 }}>
-              {filteredPrices.length === 0 && (
-                <div style={{ textAlign:"center",padding:"30px 0",color:"#8a7a6a",fontSize:13 }}>
-                  검색 결과가 없습니다
-                </div>
-              )}
-              {filteredPrices.map((p,i)=>{
-                const stockEntry = stockMap[p.id];
-                const stockQty = stockEntry ? stockEntry.stock : (p.stock ?? 0);
-                const hasStock = stockQty > 0;
-                const lowStock = hasStock && stockQty < 30;
-                const midStock = hasStock && stockQty >= 30 && stockQty < 80;
-                const stockColor = !hasStock ? "#ccc" : lowStock ? "#e03131" : midStock ? "#f08c00" : "#2f9e44";
-                return (
-                  <div key={p.id} onClick={()=>setPriceModal(p)}
-                    style={{ padding:"10px 12px", borderRadius:12,
-                      border:"1px solid #ede4da",
-                      background: i%2===0?"#fff":"#fdfaf6",
-                      cursor:"pointer",
-                      display:"flex", alignItems:"center", justifyContent:"space-between", gap:10,
-                      opacity: hasStock ? 1 : 0.45,
-                    }}>
-                    <div style={{ flex:1,minWidth:0 }}>
-                      <div style={{ fontWeight:700,color:"#1a1a18",fontSize:13,lineHeight:1.35 }}>{p.name}</div>
-                      <div style={{ marginTop:4,display:"flex",gap:8,flexWrap:"wrap" }}>
-                        {GROUP_KEYS.map(k=>(
-                          <span key={k} style={{ fontSize:10,color:k===pgFilter?GROUPS[k].color:"#8a7a6a",fontWeight:k===pgFilter?700:400 }}>
-                            {GROUPS[k].label.slice(0,2)} {(p.prices[k]||0).toLocaleString()}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div style={{ display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0 }}>
-                      <div style={{ fontWeight:700,fontSize:15,color:stockColor,whiteSpace:"nowrap" }}>
-                        {hasStock ? `${stockQty.toLocaleString()}kg` : "—"}
-                        {lowStock && <span style={{ fontSize:10,marginLeft:2 }}>⚠</span>}
-                      </div>
-                      <span style={{ fontSize:9,color:"#bbb" }}>✏️ 수정</span>
+            <div style={S.table}>
+              <div style={{ display:"grid",gridTemplateColumns:"1fr 58px 58px 86px 52px 44px",padding:"9px 12px",background:"rgba(184,134,11,0.08)",borderBottom:"1px solid rgba(212,175,55,0.1)",fontSize:10,color:"#6b5b3a",fontWeight:700 }}>
+                <span>상품명 (전 그룹 단가)</span><span style={{textAlign:"center"}}>원산지</span><span style={{textAlign:"center"}}>가공</span>
+                <span style={{textAlign:"right",color:GROUPS[pgFilter].color}}>{GROUPS[pgFilter].label}</span>
+                <span style={{textAlign:"right"}}>재고</span><span style={{textAlign:"center"}}>수정</span>
+              </div>
+              {filteredPrices.map((p,i)=>(
+                <div key={p.id} style={{ display:"grid",gridTemplateColumns:"1fr 58px 58px 86px 52px 44px",padding:"10px 12px",alignItems:"center",background:i%2===0?"transparent":"#fdf9f2",borderBottom:"1px solid rgba(0,0,0,0.03)" }}>
+                  <div>
+                    <div style={{ fontWeight:600,color:"#1a1208",fontSize:12 }}>{p.name}</div>
+                    <div style={{ marginTop:3,display:"flex",gap:6,flexWrap:"wrap" }}>
+                      {GROUP_KEYS.map(k=>(
+                        <span key={k} style={{ fontSize:9,color:GROUPS[k].color }}>{GROUPS[k].label.slice(0,2)} {p.prices[k].toLocaleString()}</span>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
+                  <div style={{ textAlign:"center",color:"#7a7060",fontSize:11 }}>{p.origin}</div>
+                  <div style={{ textAlign:"center" }}>
+                    <span style={{ padding:"1px 6px",borderRadius:8,fontSize:10,background:p.process==="워시드"?"rgba(100,150,255,0.12)":p.process==="내추럴"?"rgba(255,120,80,0.12)":"rgba(120,200,120,0.12)",color:p.process==="워시드"?"#8aabff":p.process==="내추럴"?"#ff9a7a":"#8ad08a" }}>{p.process}</span>
+                  </div>
+                  <div style={{ textAlign:"right",color:GROUPS[pgFilter].color,fontWeight:700,fontSize:13 }}>{p.prices[pgFilter].toLocaleString()}</div>
+                  <div style={{ textAlign:"right",fontWeight:600,fontSize:12,color:p.stock<30?"#ff6b6b":p.stock<80?"#ffa94d":"#69db7c" }}>{p.stock}{p.stock<30&&"⚠"}</div>
+                  <div style={{ textAlign:"center" }}><button onClick={()=>setPriceModal(p)} style={{ padding:"3px 8px",borderRadius:6,border:"1px solid rgba(212,175,55,0.3)",background:"transparent",color:"#7a6a4a",fontSize:10,cursor:"pointer" }}>✏️</button></div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1572,8 +1466,8 @@ export default function App() {
         {tab==="clients" && (
           <div>
             <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18 }}>
-              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#c41230" }}>거래처 관리</h2>
-              <button onClick={()=>setClientModal("add")} style={{ padding:"7px 14px",borderRadius:9,border:"1px solid rgba(196,18,48,0.35)",background:"rgba(212,175,55,0.1)",color:"#c41230",fontSize:12,cursor:"pointer",fontWeight:700 }}>+ 추가</button>
+              <h2 style={{ margin:0,fontSize:18,fontWeight:800,color:"#b8860b" }}>거래처 관리</h2>
+              <button onClick={()=>setClientModal("add")} style={{ padding:"7px 14px",borderRadius:9,border:"1px solid rgba(212,175,55,0.4)",background:"rgba(212,175,55,0.1)",color:"#b8860b",fontSize:12,cursor:"pointer",fontWeight:700 }}>+ 추가</button>
             </div>
             <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:18 }}>
               {GROUP_KEYS.map(k=>{ const g=GROUPS[k]; const cnt=clients.filter(c=>c.group===k).length; return (
@@ -1590,19 +1484,19 @@ export default function App() {
                   <div key={c.id} style={{ padding:"13px 15px",borderRadius:13,border:`1px solid ${g.color}33`,background:`linear-gradient(135deg,${g.bg},#faf7f0)`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                     <div>
                       <div style={{ display:"flex",alignItems:"center",gap:7,marginBottom:3 }}>
-                        <span style={{ fontWeight:700,fontSize:14,color:"#1a1a18" }}>{c.name}</span>
+                        <span style={{ fontWeight:700,fontSize:14,color:"#1a1208" }}>{c.name}</span>
                         <span style={{ padding:"2px 8px",borderRadius:8,fontSize:10,fontWeight:700,background:g.bg,color:g.color }}>{g.label}</span>
                       </div>
-                      <div style={{ fontSize:12,color:"#4a3a2a" }}>{c.phone}</div>
+                      <div style={{ fontSize:12,color:"#6b5b3a" }}>{c.phone}</div>
                     </div>
                     <div style={{ display:"flex",gap:7 }}>
-                      <button onClick={()=>setClientModal(c)} style={{ padding:"4px 10px",borderRadius:7,border:"1px solid rgba(212,175,55,0.25)",background:"transparent",color:"#4a3a2a",fontSize:11,cursor:"pointer" }}>수정</button>
+                      <button onClick={()=>setClientModal(c)} style={{ padding:"4px 10px",borderRadius:7,border:"1px solid rgba(212,175,55,0.25)",background:"transparent",color:"#7a6a4a",fontSize:11,cursor:"pointer" }}>수정</button>
                       <button onClick={()=>{ setClients(prev=>prev.filter(x=>x.id!==c.id)); if(selClient?.id===c.id)setSelClient(null); }} style={{ padding:"4px 10px",borderRadius:7,border:"1px solid rgba(255,80,80,0.25)",background:"transparent",color:"#ff6b6b",fontSize:11,cursor:"pointer" }}>삭제</button>
                     </div>
                   </div>
                 );
               })}
-              {clients.length===0 && <div style={{ padding:"40px",textAlign:"center",color:"#6a8a6a",fontSize:13 }}>등록된 거래처가 없습니다</div>}
+              {clients.length===0 && <div style={{ padding:"40px",textAlign:"center",color:"#9a8a6a",fontSize:13 }}>등록된 거래처가 없습니다</div>}
             </div>
           </div>
         )}
@@ -1612,8 +1506,8 @@ export default function App() {
           <div>
             {step==="input" && (
               <div>
-                <h2 style={{ fontSize:21,fontWeight:800,color:"#c41230",margin:"0 0 5px" }}>발주 문자 분석</h2>
-                <p style={{ fontSize:12,color:"#4a3a2a",margin:"0 0 18px",lineHeight:1.6 }}>거래처 문자를 붙여넣으면 단가그룹에 맞는 발주폼을 자동 생성합니다.</p>
+                <h2 style={{ fontSize:21,fontWeight:800,color:"#b8860b",margin:"0 0 5px" }}>발주 문자 분석</h2>
+                <p style={{ fontSize:12,color:"#6b5b3a",margin:"0 0 18px",lineHeight:1.6 }}>거래처 문자를 붙여넣으면 단가그룹에 맞는 발주폼을 자동 생성합니다.</p>
 
                 <ClientSearch clients={clients} selClient={selClient} onSelect={c => {
                   setSelClient(c);
@@ -1631,7 +1525,7 @@ export default function App() {
                     ...S.input,
                     marginBottom:14,
                     background: selClient ? "rgba(0,0,0,0.03)" : "#fff",
-                    color: selClient ? "#6a8a6a" : "#1a1a18",
+                    color: selClient ? "#9a8a6a" : "#1a1208",
                     cursor: selClient ? "default" : "text",
                   }}
                 />
@@ -1639,22 +1533,22 @@ export default function App() {
                 <label style={S.label}>문자 내용 *</label>
                 <textarea value={sms} onChange={e=>setSms(e.target.value)} placeholder="거래처에서 받은 문자를 그대로 붙여넣으세요…" rows={6} style={S.textarea} />
 
-                <button onClick={doAnalyze} disabled={!sms.trim()} style={{ ...S.bigBtn, background:sms.trim()?`linear-gradient(135deg,${G.color},#8b6914)`:"#fff", color:sms.trim()?"#faf8f4":"#6a8a6a", cursor:sms.trim()?"pointer":"not-allowed", boxShadow:sms.trim()?`0 4px 20px ${G.color}44`:"none" }}>
+                <button onClick={doAnalyze} disabled={!sms.trim()} style={{ ...S.bigBtn, background:sms.trim()?`linear-gradient(135deg,${G.color},#8b6914)`:"#fff", color:sms.trim()?"#f5f0e8":"#9a8a6a", cursor:sms.trim()?"pointer":"not-allowed", boxShadow:sms.trim()?`0 4px 20px ${G.color}44`:"none" }}>
                   ✦ 발주 분석 시작
                 </button>
 
                 {/* 거래처 최근 발주 이력 (Supabase) */}
                 {selClient && (
-                  <div style={{ marginTop:16, padding:"14px", borderRadius:13, background:"#ffffff", border:"1px solid #e0d5b8" }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#4a3a2a", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div style={{ marginTop:16, padding:"14px", borderRadius:13, background:"#fffdf7", border:"1px solid #e0d5b8" }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:"#6b5b3a", marginBottom:10, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                       <span>📋 {selClient.name} 최근 발주 이력</span>
                       {!DB_ENABLED && <span style={{ fontSize:10, color:"#dc2626" }}>DB 미연결</span>}
-                      {DB_ENABLED && clientHistoryLoading && <span style={{ fontSize:10, color:"#6a8a6a" }}>조회 중...</span>}
+                      {DB_ENABLED && clientHistoryLoading && <span style={{ fontSize:10, color:"#9a8a6a" }}>조회 중...</span>}
                     </div>
                     {!DB_ENABLED ? (
-                      <div style={{ fontSize:12, color:"#6a8a6a" }}>Supabase 연결 후 이력이 여기에 표시됩니다.</div>
+                      <div style={{ fontSize:12, color:"#9a8a6a" }}>Supabase 연결 후 이력이 여기에 표시됩니다.</div>
                     ) : clientHistory.length === 0 && !clientHistoryLoading ? (
-                      <div style={{ fontSize:12, color:"#6a8a6a" }}>아직 발주 이력이 없습니다.</div>
+                      <div style={{ fontSize:12, color:"#9a8a6a" }}>아직 발주 이력이 없습니다.</div>
                     ) : (
                       <div style={{ display:"flex", flexDirection:"column", gap:7 }}>
                         {clientHistory.map((h, i) => {
@@ -1667,7 +1561,7 @@ export default function App() {
                               <div style={{ padding:"9px 12px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                                 <div style={{ fontSize:11, color:g.color, fontWeight:700 }}>{dateStr} · {g.label}</div>
                                 <div style={{ display:"flex", gap:6 }}>
-                                  <span style={{ fontSize:11, color:"#4a3a2a" }}>총 {(h.total_qty||0)}kg · {(h.total_price||0).toLocaleString()}원</span>
+                                  <span style={{ fontSize:11, color:"#6b5b3a" }}>총 {(h.total_qty||0)}kg · {(h.total_price||0).toLocaleString()}원</span>
                                   {/* 이전 발주 그대로 불러오기 버튼 */}
                                   <button onClick={() => {
                                     // 이전 발주 품목을 items에 채워줌
@@ -1682,18 +1576,18 @@ export default function App() {
                                     setMode("form");
                                   }} style={{
                                     padding:"2px 8px", borderRadius:6, border:"none",
-                                    background:"#c41230", color:"#fff", fontSize:10,
+                                    background:"#b8860b", color:"#fff", fontSize:10,
                                     cursor:"pointer", fontWeight:700, whiteSpace:"nowrap"
                                   }}>불러오기</button>
                                 </div>
                               </div>
-                              <div style={{ padding:"0 12px 9px", fontSize:11, color:"#1a1a18" }}>
+                              <div style={{ padding:"0 12px 9px", fontSize:11, color:"#4a3820" }}>
                                 {hItems.slice(0,3).map((it,j) => (
                                   <span key={j} style={{ marginRight:8 }}>
                                     {it.product_name?.split(" ").slice(0,4).join(" ")} {it.qty}kg
                                   </span>
                                 ))}
-                                {hItems.length > 3 && <span style={{ color:"#6a8a6a" }}>외 {hItems.length-3}건</span>}
+                                {hItems.length > 3 && <span style={{ color:"#9a8a6a" }}>외 {hItems.length-3}건</span>}
                               </div>
                             </div>
                           );
@@ -1705,9 +1599,9 @@ export default function App() {
 
                 {/* 최근 발주 내역 */}
                 <div style={{ marginTop:16 }}>
-                  <div style={{ fontSize:11,color:"#4a3a2a",fontWeight:700,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
+                  <div style={{ fontSize:11,color:"#6b5b3a",fontWeight:700,marginBottom:10,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                     <span>🕘 최근 발주 내역</span>
-                    <span style={{ fontSize:10,color:"#6a8a6a" }}>{history.length}/{MAX_HISTORY}</span>
+                    <span style={{ fontSize:10,color:"#9a8a6a" }}>{history.length}/{MAX_HISTORY}</span>
                   </div>
                   <HistoryList history={history} onLoad={loadHistory} onDelete={deleteHistory} />
                 </div>
@@ -1722,24 +1616,24 @@ export default function App() {
                     <div style={{ display:"flex",alignItems:"center",gap:8 }}>
                       <span style={{ fontSize:20 }}>{analysis.intent==="발주요청"?"📦":"💬"}</span>
                       <div>
-                        <div style={{ fontWeight:800,color:"#c41230",fontSize:14,display:"flex",alignItems:"center",gap:6 }}>
+                        <div style={{ fontWeight:800,color:"#b8860b",fontSize:14,display:"flex",alignItems:"center",gap:6 }}>
                           {analysis.intent}
                           <span style={{ padding:"2px 8px",borderRadius:9,fontSize:10,background:G.bg,color:G.color,fontWeight:700 }}>{G.label}</span>
                           {analysis.urgent&&<span style={{ padding:"2px 7px",borderRadius:9,background:"rgba(255,80,80,0.2)",color:"#ff8a8a",fontSize:10 }}>🔴 긴급</span>}
                         </div>
-                        <div style={{ fontSize:11,color:"#4a3a2a",marginTop:2 }}>{selClient?.name||analysis.sender_name||phone||"발신자 미상"} · {orderDate}</div>
+                        <div style={{ fontSize:11,color:"#6b5b3a",marginTop:2 }}>{selClient?.name||analysis.sender_name||phone||"발신자 미상"} · {orderDate}</div>
                       </div>
                     </div>
                     <span style={{ fontSize:10,color:"#aaa090" }}>{orderNo}</span>
                   </div>
-                  <div style={{ padding:"10px 13px",borderRadius:9,background:"rgba(0,0,0,0.03)",border:"1px solid rgba(212,175,55,0.1)",fontSize:12,color:"#1a1a18",lineHeight:1.75 }}>
-                    <span style={{ fontSize:9,color:"#4a3a2a",fontWeight:700,marginRight:5 }}>요약</span>{analysis.summary}
+                  <div style={{ padding:"10px 13px",borderRadius:9,background:"rgba(0,0,0,0.03)",border:"1px solid rgba(212,175,55,0.1)",fontSize:12,color:"#4a3820",lineHeight:1.75 }}>
+                    <span style={{ fontSize:9,color:"#6b5b3a",fontWeight:700,marginRight:5 }}>요약</span>{analysis.summary}
                   </div>
                 </div>
 
-                <div style={{ padding:"11px 13px",borderRadius:11,marginBottom:14,background:"#faf8f4",border:"1px solid #e0d5b8" }}>
-                  <div style={{ fontSize:10,color:"#6a8a6a",marginBottom:5,fontWeight:600 }}>원본 문자</div>
-                  <div style={{ fontSize:12,color:"#1a1a18",lineHeight:1.75,whiteSpace:"pre-wrap" }}>{sms}</div>
+                <div style={{ padding:"11px 13px",borderRadius:11,marginBottom:14,background:"#f5f0e8",border:"1px solid #e0d5b8" }}>
+                  <div style={{ fontSize:10,color:"#9a8a6a",marginBottom:5,fontWeight:600 }}>원본 문자</div>
+                  <div style={{ fontSize:12,color:"#4a3820",lineHeight:1.75,whiteSpace:"pre-wrap" }}>{sms}</div>
                 </div>
 
                 {/* 재고 확인 배너 - 재고표가 업로드된 경우에만 표시 */}
@@ -1764,22 +1658,22 @@ export default function App() {
 
                   return (
                     <div style={{ marginBottom:14, padding:"13px 14px", borderRadius:12, border:"1px solid #e0d5b8", background:"#fff" }}>
-                      <div style={{ fontWeight:700, fontSize:12, color:"#4a3a2a", marginBottom:10, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <div style={{ fontWeight:700, fontSize:12, color:"#6b5b3a", marginBottom:10, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                           📦 재고 확인
-                          <span style={{ fontSize:10, color:"#6a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
+                          <span style={{ fontSize:10, color:"#9a8a6a", fontWeight:400 }}>— 오늘 재고표 기준</span>
                         </div>
                         <span style={{ fontSize:10, color:"#059669" }}>✓ {Object.keys(stockMap).length}개 품목 로드</span>
                       </div>
                       <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
                         {warnings.map((c, i) => (
                           <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#fef2f2", border:"1px solid #fca5a5" }}>
-                            <span style={{ fontSize:12, color:"#1a1a18", fontWeight:500 }}>{c.name}</span>
+                            <span style={{ fontSize:12, color:"#1a1208", fontWeight:500 }}>{c.name}</span>
                             <div style={{ textAlign:"right" }}>
                               <div style={{ fontSize:11, fontWeight:700, color:"#dc2626" }}>
                                 {!c.entry.available ? "⚠ 품절" : `재고 ${c.entry.stock}kg`}
                               </div>
-                              <div style={{ fontSize:10, color:"#6a8a6a" }}>
+                              <div style={{ fontSize:10, color:"#9a8a6a" }}>
                                 발주 {c.qty}kg {!c.entry.available ? "→ 발주 불가" : `→ ${c.entry.stock - c.qty}kg 부족`}
                               </div>
                             </div>
@@ -1787,19 +1681,19 @@ export default function App() {
                         ))}
                         {oks.map((c, i) => (
                           <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#f0fdf4", border:"1px solid #86efac" }}>
-                            <span style={{ fontSize:12, color:"#1a1a18", fontWeight:500 }}>{c.name}</span>
+                            <span style={{ fontSize:12, color:"#1a1208", fontWeight:500 }}>{c.name}</span>
                             <div style={{ textAlign:"right" }}>
                               <div style={{ fontSize:11, fontWeight:700, color:"#059669" }}>
                                 {c.entry.stock < 0 ? "재고 확인필요" : `재고 ${c.entry.stock}kg ✓`}
                               </div>
-                              <div style={{ fontSize:10, color:"#6a8a6a" }}>발주 {c.qty}kg → 발주 가능</div>
+                              <div style={{ fontSize:10, color:"#9a8a6a" }}>발주 {c.qty}kg → 발주 가능</div>
                             </div>
                           </div>
                         ))}
                         {unknown.map((c, i) => (
                           <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 11px", borderRadius:8, background:"#fafaf9", border:"1px solid #e7e5e4" }}>
-                            <span style={{ fontSize:12, color:"#4a3a2a" }}>{c.name}</span>
-                            <span style={{ fontSize:11, color:"#6a8a6a" }}>재고표 미매칭</span>
+                            <span style={{ fontSize:12, color:"#6b5b3a" }}>{c.name}</span>
+                            <span style={{ fontSize:11, color:"#9a8a6a" }}>재고표 미매칭</span>
                           </div>
                         ))}
                       </div>
@@ -1818,7 +1712,7 @@ export default function App() {
                             <div style={{ fontWeight:700,fontSize:13,color:"#ffa94d" }}>
                               "{a.keyword}" — 어떤 품목인가요?
                             </div>
-                            <div style={{ fontSize:11,color:"#4a3a2a",marginTop:2 }}>
+                            <div style={{ fontSize:11,color:"#7a6a4a",marginTop:2 }}>
                               수량: {a.qty > 0 ? `${a.qty}kg` : "미감지 (선택 후 수량 입력)"} · 아래 품목 중 하나를 선택하세요
                             </div>
                           </div>
@@ -1833,14 +1727,14 @@ export default function App() {
                               onMouseOver={e=>e.currentTarget.style.background="rgba(255,165,0,0.15)"}
                               onMouseOut={e=>e.currentTarget.style.background="rgba(255,165,0,0.05)"}
                             >
-                              <span style={{ fontWeight:600,fontSize:13,color:"#1a1a18" }}>{cand.name}</span>
+                              <span style={{ fontWeight:600,fontSize:13,color:"#1a1208" }}>{cand.name}</span>
                               <span style={{ fontSize:11,color:"#ffa94d",fontWeight:700 }}>
                                 {getPrice(priceList.find(p=>p.id===cand.id), activeGroup).toLocaleString()}원/kg
                               </span>
                             </button>
                           ))}
                           <button onClick={() => setAmbiguous(prev => prev.filter((_,i)=>i!==ai))}
-                            style={{ padding:"7px",borderRadius:8,border:"1px solid rgba(0,0,0,0.05)",background:"transparent",color:"#4a3a2a",fontSize:11,cursor:"pointer" }}>
+                            style={{ padding:"7px",borderRadius:8,border:"1px solid rgba(0,0,0,0.05)",background:"transparent",color:"#6b5b3a",fontSize:11,cursor:"pointer" }}>
                             건너뛰기
                           </button>
                         </div>
@@ -1851,7 +1745,7 @@ export default function App() {
 
                 <div style={{ display:"flex",gap:7,marginBottom:14 }}>
                   {[["form","📄 발주폼"],["edit","⚙️ 항목 편집"]].map(([v,l])=>(
-                    <button key={v} onClick={()=>setMode(v)} style={{ padding:"6px 14px",borderRadius:9,fontSize:12,cursor:"pointer",border:`1px solid ${mode===v?G.color:"rgba(184,134,11,0.15)"}`,background:mode===v?G.bg:"transparent",color:mode===v?G.color:"#4a3a2a",fontWeight:mode===v?700:400 }}>{l}</button>
+                    <button key={v} onClick={()=>setMode(v)} style={{ padding:"6px 14px",borderRadius:9,fontSize:12,cursor:"pointer",border:`1px solid ${mode===v?G.color:"rgba(184,134,11,0.15)"}`,background:mode===v?G.bg:"transparent",color:mode===v?G.color:"#6b5b3a",fontWeight:mode===v?700:400 }}>{l}</button>
                   ))}
                 </div>
 
@@ -1861,12 +1755,12 @@ export default function App() {
                   <div>
                     {items.map((it,i)=>{ const p=it.matched; const pr=getPrice(p,activeGroup); const sub=pr*it.qty;
                       return (
-                      <div key={i} style={{ borderRadius:11,border:`1px solid ${p?"#e8ddd8":"rgba(255,120,80,0.25)"}`,background:p?"#ffffff":"rgba(255,120,80,0.03)",padding:"13px",marginBottom:9 }}>
+                      <div key={i} style={{ borderRadius:11,border:`1px solid ${p?"#e0d5b8":"rgba(255,120,80,0.25)"}`,background:p?"#fffdf7":"rgba(255,120,80,0.03)",padding:"13px",marginBottom:9 }}>
                         <div style={{ display:"flex",justifyContent:"space-between",marginBottom:9 }}>
                           <div style={{ flex:1 }}>
                             {/* 품목 검색 자동완성 — 매칭 여부 관계없이 항상 표시 */}
                             {p && (
-                              <div style={{ fontSize:11,color:"#6a8a6a",marginBottom:4,display:"flex",gap:8 }}>
+                              <div style={{ fontSize:11,color:"#9a8a6a",marginBottom:4,display:"flex",gap:8 }}>
                                 <span style={{ color:G.color,fontWeight:700 }}>{G.label} {pr.toLocaleString()}원/kg</span>
                                 {p.stock > 0 && <span>재고 {p.stock}kg</span>}
                               </div>
@@ -1888,20 +1782,20 @@ export default function App() {
                         </div>
                         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                           <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-                            <span style={{ fontSize:11,color:"#4a3a2a" }}>수량(kg)</span>
+                            <span style={{ fontSize:11,color:"#6b5b3a" }}>수량(kg)</span>
                             <input type="number" min={0} value={it.qty} onChange={e=>setItems(prev=>prev.map((x,j)=>j===i?{...x,qty:Number(e.target.value)}:x))}
-                              style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#faf8f4",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
+                              style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#f5f0e8",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
                           </div>
                           {p && <span style={{ fontWeight:800,fontSize:14,color:G.color }}>{sub.toLocaleString()}원</span>}
                         </div>
                       </div>
                     );})}
-                    <button onClick={()=>setItems(prev=>[...prev,{product_name:"신규 품목",qty:0,matched:null}])} style={{ width:"100%",padding:"11px",borderRadius:9,marginTop:5,border:`1px dashed ${G.color}55`,background:"transparent",color:"#4a3a2a",fontSize:12,cursor:"pointer",fontWeight:600 }}>+ 품목 직접 추가</button>
+                    <button onClick={()=>setItems(prev=>[...prev,{product_name:"신규 품목",qty:0,matched:null}])} style={{ width:"100%",padding:"11px",borderRadius:9,marginTop:5,border:`1px dashed ${G.color}55`,background:"transparent",color:"#7a6a4a",fontSize:12,cursor:"pointer",fontWeight:600 }}>+ 품목 직접 추가</button>
                     {subtotal>0&&(
                       <div style={{ padding:"13px 16px",borderRadius:11,marginTop:11,background:G.bg,border:`1px solid ${G.color}44` }}>
                         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
                           <div>
-                            <div style={{ fontSize:11,color:"#4a3a2a" }}>소계{totalQtyEdit<20?` + 배송비 ${DELIVERY_FEE.toLocaleString()}원`:" (배송비 무료 ✓)"}</div>
+                            <div style={{ fontSize:11,color:"#6b5b3a" }}>소계{totalQtyEdit<20?` + 배송비 ${DELIVERY_FEE.toLocaleString()}원`:" (배송비 무료 ✓)"}</div>
                             <div style={{ fontSize:10,color:"#aaa090",marginTop:1 }}>{items.filter(i=>i.matched).length}품목 · {totalQtyEdit}kg</div>
                           </div>
                           <div style={{ fontSize:20,fontWeight:900,color:G.color }}>{totalEdit.toLocaleString()}원</div>
@@ -1918,7 +1812,7 @@ export default function App() {
                       marginBottom:8, padding:"8px 12px", borderRadius:8, fontSize:11, fontWeight:600,
                       background: dbStatus==="saved" ? "#f0fdf4" : dbStatus==="saving" ? "#eff6ff" : "#fef2f2",
                       color:      dbStatus==="saved" ? "#059669" : dbStatus==="saving" ? "#2563eb" : "#dc2626",
-                      border:     `1px solid ${dbStatus==="saved" ? "#6abf8a" : dbStatus==="saving" ? "#bfdbfe" : "#fca5a5"}`,
+                      border:     `1px solid ${dbStatus==="saved" ? "#86efac" : dbStatus==="saving" ? "#bfdbfe" : "#fca5a5"}`,
                     }}>
                       {dbStatus==="saving" && "⏳ DB 저장 중..."}
                       {dbStatus==="saved"  && "✅ DB 저장 완료"}
@@ -1943,7 +1837,7 @@ export default function App() {
                         setClientHistory([]);
                         setConfirmed(false);
                       }
-                    }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#4a3a2a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
+                    }} style={{ flex:1,padding:"13px",borderRadius:11,border:"1px solid rgba(212,175,55,0.16)",background:"transparent",color:"#6b5b3a",fontSize:13,cursor:"pointer",fontWeight:700 }}>← 다시 입력</button>
                     <button onClick={()=>{
                       saveHistory(analysis, items, activeGroup, selClient?.name||null);
                       handleBottomCopy();
@@ -1962,12 +1856,12 @@ export default function App() {
 }
 
 const st = {
-  wrap:     { minHeight:"100vh",background:"#f7f4ef",fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif",color:"#1a1a18" },
-  header:   { borderBottom:"1px solid #ede4da",padding:"0 14px",background:"#ffffff",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"space-between",minHeight:56,boxShadow:"0 1px 6px rgba(196,18,48,0.07)" },
-  logo:     { height:38,objectFit:"contain" },
-  label:    { display:"block",fontSize:11,color:"#5a4a38",marginBottom:7,fontWeight:600,letterSpacing:"0.02em" },
-  input:    { width:"100%",padding:"10px 12px",borderRadius:9,background:"#fff",border:"1px solid #e0d4cc",color:"#1a1a18",fontSize:13,outline:"none",boxSizing:"border-box" },
-  textarea: { width:"100%",padding:"12px",borderRadius:11,marginBottom:14,background:"#fff",border:"1px solid #e0d4cc",color:"#1a1a18",fontSize:13,resize:"vertical",outline:"none",lineHeight:1.7,boxSizing:"border-box",fontFamily:"inherit" },
+  wrap:     { minHeight:"100vh",background:"#f5f0e8",fontFamily:"'Pretendard','Apple SD Gothic Neo',sans-serif",color:"#1a1208" },
+  header:   { borderBottom:"1px solid #ddd0b0",padding:"0 16px",background:"#fffdf7",position:"sticky",top:0,zIndex:100,display:"flex",alignItems:"center",justifyContent:"space-between",height:58,boxShadow:"0 1px 4px rgba(0,0,0,0.08)" },
+  logo:     { width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,#b8860b,#8b6914)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:15,boxShadow:"0 0 8px rgba(184,134,11,0.3)" },
+  label:    { display:"block",fontSize:11,color:"#6b5b3a",marginBottom:7,fontWeight:600 },
+  input:    { width:"100%",padding:"10px 12px",borderRadius:9,background:"#fff",border:"1px solid #d4c49a",color:"#1a1208",fontSize:13,outline:"none",boxSizing:"border-box" },
+  textarea: { width:"100%",padding:"12px",borderRadius:11,marginBottom:14,background:"#fff",border:"1px solid #d4c49a",color:"#1a1208",fontSize:13,resize:"vertical",outline:"none",lineHeight:1.7,boxSizing:"border-box",fontFamily:"inherit" },
   bigBtn:   { width:"100%",padding:"14px",borderRadius:12,border:"none",fontSize:14,fontWeight:800,letterSpacing:"0.04em",transition:"all 0.2s" },
-  table:    { background:"#fff",borderRadius:13,border:"1px solid #ede4da",overflow:"hidden" },
+  table:    { background:"#fff",borderRadius:13,border:"1px solid #e0d5b8",overflow:"hidden" },
 };
