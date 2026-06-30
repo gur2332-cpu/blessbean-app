@@ -30,6 +30,13 @@ function getPrice(product, group) {
   if (!product) return 0;
   return product.prices?.[group] ?? product.prices?.PREMIUM ?? 0;
 }
+// 품목별 단가 수동 오버라이드가 있으면 그 값을 우선 사용 (대체출고 시 단가 직접 조정용)
+function getItemPrice(it, group) {
+  if (it.priceOverride !== undefined && it.priceOverride !== null && it.priceOverride !== "") {
+    return Number(it.priceOverride);
+  }
+  return getPrice(it.matched, group);
+}
 function genId()      { return Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 function genOrderNo() {
   const n = new Date();
@@ -254,7 +261,7 @@ function buildPlainText(analysis, items, group, clientName, payMethod="account")
   const displayName = clientName || analysis.sender_name || "";
   const totalQty   = items.reduce((s,it)=>s+it.qty,0);
   const delivFee   = totalQty < 20 ? DELIVERY_FEE : 0;
-  const subtotal   = items.reduce((s,it)=>s+getPrice(it.matched,group)*it.qty,0);
+  const subtotal   = items.reduce((s,it)=>s+getItemPrice(it,group)*it.qty,0);
   const total      = subtotal + delivFee;
   const isCard     = payMethod === "card";
   return [
@@ -267,7 +274,7 @@ function buildPlainText(analysis, items, group, clientName, payMethod="account")
     displayName,
     "",
     ...items.map(it => {
-      const p=it.matched; const pr=getPrice(p,group);
+      const p=it.matched; const pr=getItemPrice(it,group);
       return p ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원` : `${it.product_name} ${it.qty}kg * 확인필요`;
     }),
     "",
@@ -291,7 +298,7 @@ function buildOrderText(items, group, clientName, analysis, payMethod="account")
   const displayName = clientName || analysis.sender_name || "";
   const totalQty    = items.reduce((s,it) => s+it.qty, 0);
   const delivFee    = totalQty < 20 ? DELIVERY_FEE : 0;
-  const subtotal    = items.reduce((s,it) => s+getPrice(it.matched,group)*it.qty, 0);
+  const subtotal    = items.reduce((s,it) => s+getItemPrice(it,group)*it.qty, 0);
   const total       = subtotal + delivFee;
   const isCard      = payMethod === "card";
 
@@ -300,7 +307,7 @@ function buildOrderText(items, group, clientName, analysis, payMethod="account")
     "",
     ...items.map(it => {
       const p  = it.matched;
-      const pr = getPrice(p, group);
+      const pr = getItemPrice(it, group);
       return p
         ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원`
         : `${it.product_name} ${it.qty}kg * 확인필요`;
@@ -347,7 +354,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
   const G = GROUPS[group];
   const totalQty = items.reduce((s,it)=>s+it.qty,0);
   const delivFee = totalQty < 20 ? DELIVERY_FEE : 0;
-  const subtotal = items.reduce((s,it)=>s+getPrice(it.matched,group)*it.qty,0);
+  const subtotal = items.reduce((s,it)=>s+getItemPrice(it,group)*it.qty,0);
   const total    = subtotal + delivFee;
   const displayName = clientName || analysis.sender_name || "";
 
@@ -419,7 +426,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
           {displayName && <div style={{ fontWeight:800, color:"#1a1208", marginBottom:12 }}>{displayName}</div>}
           <div style={{ marginBottom:16 }}>
             {items.length===0 && <div style={{ padding:"16px", textAlign:"center", color:"#6b5b3a", fontSize:13, background:"#f5f0e8", borderRadius:8 }}>품목 없음 — 항목 편집에서 추가하세요</div>}
-            {items.map((it,i) => { const p=it.matched; const pr=getPrice(p,group); const lp=p?pr*it.qty:null; return (
+            {items.map((it,i) => { const p=it.matched; const pr=getItemPrice(it,group); const lp=p?pr*it.qty:null; return (
               <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", marginBottom:5, borderRadius:8, background:p?"rgba(184,134,11,0.05)":"rgba(255,120,80,0.06)", border:`1px solid ${p?"#d4c49a":"rgba(255,120,80,0.3)"}` }}>
                 <span style={{ color:p?"#1a1208":"#dc2626", fontSize:13 }}>{p?p.name:<>{it.product_name}<span style={{fontSize:11,marginLeft:4}}>(확인필요)</span></>}</span>
                 <div style={{ textAlign:"right", marginLeft:12 }}>
@@ -459,7 +466,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
             {displayName}{"\n"}
             {"\n"}
             {items.map(it => {
-              const p=it.matched; const pr=getPrice(p,group);
+              const p=it.matched; const pr=getItemPrice(it,group);
               return (p ? `${p.name} ${it.qty}kg * ${pr.toLocaleString()}원` : `${it.product_name} ${it.qty}kg * 확인필요`);
             }).join("\n")}{"\n"}
             {"\n"}
@@ -1222,7 +1229,7 @@ export default function App() {
     setDbStatus("saving");
     try {
       const totalQty   = its.reduce((s, it) => s + it.qty, 0);
-      const totalPrice = its.reduce((s, it) => s + getPrice(it.matched, grp) * it.qty, 0);
+      const totalPrice = its.reduce((s, it) => s + getItemPrice(it, grp) * it.qty, 0);
 
       const res = await fetch("/api/db", {
         method: "POST",
@@ -1240,7 +1247,7 @@ export default function App() {
                 product_id:   it.matched?.id || null,
                 product_name: it.product_name,
                 qty:          it.qty,
-                unit_price:   getPrice(it.matched, grp),
+                unit_price:   getItemPrice(it, grp),
               })),
               total_qty:   totalQty,
               total_price: totalPrice,
@@ -1251,7 +1258,7 @@ export default function App() {
               product_id:   it.matched.id,
               product_name: it.matched.name,
               qty:          it.qty,
-              unit_price:   getPrice(it.matched, grp),
+              unit_price:   getItemPrice(it, grp),
               group_type:   grp,
             })),
           }
@@ -1358,7 +1365,7 @@ export default function App() {
     });
   }
 
-  const subtotal = items.reduce((s,it)=>s+getPrice(it.matched,activeGroup)*it.qty,0);
+  const subtotal = items.reduce((s,it)=>s+getItemPrice(it,activeGroup)*it.qty,0);
   const totalQtyEdit = items.reduce((s,it)=>s+it.qty,0);
   const delivEdit    = totalQtyEdit < 20 ? DELIVERY_FEE : 0;
   const totalEdit    = subtotal + delivEdit;
@@ -1753,16 +1760,21 @@ export default function App() {
 
                 {mode==="edit" && (
                   <div>
-                    {items.map((it,i)=>{ const p=it.matched; const pr=getPrice(p,activeGroup); const sub=pr*it.qty;
+                    {items.map((it,i)=>{ const p=it.matched; const pr=getItemPrice(it,activeGroup); const sub=pr*it.qty;
                       return (
                       <div key={i} style={{ borderRadius:11,border:`1px solid ${p?"#e0d5b8":"rgba(255,120,80,0.25)"}`,background:p?"#fffdf7":"rgba(255,120,80,0.03)",padding:"13px",marginBottom:9 }}>
                         <div style={{ display:"flex",justifyContent:"space-between",marginBottom:9 }}>
                           <div style={{ flex:1 }}>
                             {/* 품목 검색 자동완성 — 매칭 여부 관계없이 항상 표시 */}
                             {p && (
-                              <div style={{ fontSize:11,color:"#9a8a6a",marginBottom:4,display:"flex",gap:8 }}>
-                                <span style={{ color:G.color,fontWeight:700 }}>{G.label} {pr.toLocaleString()}원/kg</span>
+                              <div style={{ fontSize:11,color:"#9a8a6a",marginBottom:4,display:"flex",gap:8,alignItems:"center" }}>
+                                <span style={{ color:G.color,fontWeight:700 }}>
+                                  기준 {G.label} {getPrice(p,activeGroup).toLocaleString()}원/kg
+                                </span>
                                 {p.stock > 0 && <span>재고 {p.stock}kg</span>}
+                                {it.priceOverride !== undefined && it.priceOverride !== null && it.priceOverride !== "" && (
+                                  <span style={{ padding:"1px 6px",borderRadius:6,background:"rgba(255,165,0,0.15)",color:"#d97706",fontWeight:700 }}>단가 수정됨</span>
+                                )}
                               </div>
                             )}
                             {!p && (
@@ -1780,11 +1792,30 @@ export default function App() {
                           </div>
                           <button onClick={()=>setItems(prev=>prev.filter((_,j)=>j!==i))} style={{ padding:"3px 8px",borderRadius:6,border:"1px solid rgba(255,80,80,0.25)",background:"transparent",color:"#ff6b6b",fontSize:10,cursor:"pointer",marginLeft:9,alignSelf:"flex-start" }}>삭제</button>
                         </div>
-                        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center" }}>
-                          <div style={{ display:"flex",alignItems:"center",gap:7 }}>
-                            <span style={{ fontSize:11,color:"#6b5b3a" }}>수량(kg)</span>
-                            <input type="number" min={0} value={it.qty} onChange={e=>setItems(prev=>prev.map((x,j)=>j===i?{...x,qty:Number(e.target.value)}:x))}
-                              style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#f5f0e8",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
+                        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8 }}>
+                          <div style={{ display:"flex",alignItems:"center",gap:14,flexWrap:"wrap" }}>
+                            <div style={{ display:"flex",alignItems:"center",gap:7 }}>
+                              <span style={{ fontSize:11,color:"#6b5b3a" }}>수량(kg)</span>
+                              <input type="number" min={0} value={it.qty} onChange={e=>setItems(prev=>prev.map((x,j)=>j===i?{...x,qty:Number(e.target.value)}:x))}
+                                style={{ width:60,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#f5f0e8",border:`1px solid ${G.color}66`,color:G.color,fontSize:13,fontWeight:700,outline:"none" }} />
+                            </div>
+                            <div style={{ display:"flex",alignItems:"center",gap:7 }}>
+                              <span style={{ fontSize:11,color:"#6b5b3a" }}>단가(원/kg)</span>
+                              <input type="number" min={0}
+                                value={it.priceOverride !== undefined && it.priceOverride !== null ? it.priceOverride : (p ? getPrice(p,activeGroup) : "")}
+                                placeholder={p ? String(getPrice(p,activeGroup)) : "0"}
+                                onChange={e=>{
+                                  const v = e.target.value;
+                                  setItems(prev=>prev.map((x,j)=>j===i?{...x, priceOverride: v===""?null:Number(v)}:x));
+                                }}
+                                style={{ width:84,padding:"5px 8px",borderRadius:7,textAlign:"center",background:"#fff7e6",border:"1px solid rgba(255,165,0,0.4)",color:"#d97706",fontSize:13,fontWeight:700,outline:"none" }} />
+                              {it.priceOverride !== undefined && it.priceOverride !== null && it.priceOverride !== "" && (
+                                <button onClick={()=>setItems(prev=>prev.map((x,j)=>j===i?{...x, priceOverride:null}:x))}
+                                  style={{ padding:"3px 7px",borderRadius:6,border:"1px solid rgba(0,0,0,0.08)",background:"transparent",color:"#9a8a6a",fontSize:10,cursor:"pointer" }}>
+                                  초기화
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {p && <span style={{ fontWeight:800,fontSize:14,color:G.color }}>{sub.toLocaleString()}원</span>}
                         </div>
