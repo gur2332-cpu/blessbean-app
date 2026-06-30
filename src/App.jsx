@@ -257,10 +257,10 @@ function parseLocally(message, priceList) {
 
 
 // ── 거래처 발송용 텍스트 생성 (복사용) ──────────────────────────────────
-function buildPlainText(analysis, items, group, clientName, payMethod="account") {
+function buildPlainText(analysis, items, group, clientName, payMethod="account", includeDelivery=true) {
   const displayName = clientName || analysis.sender_name || "";
   const totalQty   = items.reduce((s,it)=>s+it.qty,0);
-  const delivFee   = totalQty < 20 ? DELIVERY_FEE : 0;
+  const delivFee   = includeDelivery ? DELIVERY_FEE : 0;
   const subtotal   = items.reduce((s,it)=>s+getItemPrice(it,group)*it.qty,0);
   const total      = subtotal + delivFee;
   const isCard     = payMethod === "card";
@@ -279,7 +279,7 @@ function buildPlainText(analysis, items, group, clientName, payMethod="account")
     }),
     "",
     ...(delivFee > 0 ? [`*배송비 ${delivFee.toLocaleString()}원`, ""] : []),
-    `총 금액 ${total.toLocaleString()}원`,
+    `총 수량 ${totalQty}kg / 총 금액 ${total.toLocaleString()}원`,
     "",
     // 카드결제면 계좌번호/입금확인 제거하고 카드결제 안내 추가
     ...(!isCard ? [
@@ -294,10 +294,10 @@ function buildPlainText(analysis, items, group, clientName, payMethod="account")
 }
 
 // ── 물류팀 오더방용 텍스트 생성 ─────────────────────────────────────────
-function buildOrderText(items, group, clientName, analysis, payMethod="account") {
+function buildOrderText(items, group, clientName, analysis, payMethod="account", includeDelivery=true) {
   const displayName = clientName || analysis.sender_name || "";
   const totalQty    = items.reduce((s,it) => s+it.qty, 0);
-  const delivFee    = totalQty < 20 ? DELIVERY_FEE : 0;
+  const delivFee    = includeDelivery ? DELIVERY_FEE : 0;
   const subtotal    = items.reduce((s,it) => s+getItemPrice(it,group)*it.qty, 0);
   const total       = subtotal + delivFee;
   const isCard      = payMethod === "card";
@@ -314,7 +314,7 @@ function buildOrderText(items, group, clientName, analysis, payMethod="account")
     }),
     "",
     ...(delivFee > 0 ? [`*배송비 ${delivFee.toLocaleString()}원`] : []),
-    `총 금액 ${total.toLocaleString()}원`,
+    `총 수량 ${totalQty}kg / 총 금액 ${total.toLocaleString()}원`,
     // 카드결제면 마지막에 링크요청 추가
     ...(isCard ? ["", "*카드결제링크요청"] : []),
   ].join("\n");
@@ -353,17 +353,20 @@ function CopyBtn({ text, label="📋 문자 복사", style={} }) {
 function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
   const G = GROUPS[group];
   const totalQty = items.reduce((s,it)=>s+it.qty,0);
-  const delivFee = totalQty < 20 ? DELIVERY_FEE : 0;
   const subtotal = items.reduce((s,it)=>s+getItemPrice(it,group)*it.qty,0);
-  const total    = subtotal + delivFee;
   const displayName = clientName || analysis.sender_name || "";
 
   const [copyTab,   setCopyTab]   = useState("client");
   const [copied,    setCopied]    = useState(false);
   const [payMethod, setPayMethod] = useState("account"); // "account" | "card"
+  // 배송비 포함 여부 — 기본값은 20kg 미만일 때만 자동 포함, 직접 토글 가능
+  const [includeDelivery, setIncludeDelivery] = useState(totalQty < 20);
 
-  const plainClient = buildPlainText(analysis, items, group, clientName, payMethod);
-  const plainOrder  = buildOrderText(items, group, clientName, analysis, payMethod);
+  const delivFee = includeDelivery ? DELIVERY_FEE : 0;
+  const total    = subtotal + delivFee;
+
+  const plainClient = buildPlainText(analysis, items, group, clientName, payMethod, includeDelivery);
+  const plainOrder  = buildOrderText(items, group, clientName, analysis, payMethod, includeDelivery);
 
   function handleCopy() {
     const text = copyTab === "client" ? plainClient : plainOrder;
@@ -391,6 +394,22 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
               background: payMethod==="card" ? "#2563eb" : "#e8e0cc",
               color: payMethod==="card" ? "#fff" : "#6b5b3a",
             }}>🃏 카드결제</button>
+          </div>
+        </div>
+        {/* 배송비 포함 여부 토글 */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10, padding:"7px 11px", borderRadius:8, background:"rgba(255,255,255,0.5)", border:"1px solid rgba(0,0,0,0.05)" }}>
+          <span style={{ fontSize:11, color:"#6b5b3a", fontWeight:600 }}>🚚 배송비 {DELIVERY_FEE.toLocaleString()}원 {totalQty<20 ? "(20kg 미만 기본 포함)" : "(20kg 이상 기본 미포함)"}</span>
+          <div style={{ display:"flex", gap:4 }}>
+            <button onClick={()=>{ setIncludeDelivery(true); setCopied(false); }} style={{
+              padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
+              background: includeDelivery ? "#b8860b" : "#e8e0cc",
+              color: includeDelivery ? "#fff" : "#6b5b3a",
+            }}>포함</button>
+            <button onClick={()=>{ setIncludeDelivery(false); setCopied(false); }} style={{
+              padding:"4px 10px", borderRadius:7, fontSize:11, fontWeight:700, cursor:"pointer", border:"none",
+              background: !includeDelivery ? "#6b7280" : "#e8e0cc",
+              color: !includeDelivery ? "#fff" : "#6b5b3a",
+            }}>미포함</button>
           </div>
         </div>
         {/* 복사 탭 선택 */}
@@ -438,10 +457,10 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
           </div>
           <div style={{ borderTop:"1px dashed #d4c49a", paddingTop:12 }}>
             {delivFee > 0
-              ? <div style={{ fontSize:13, color:"#6b5b3a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원 <span style={{fontSize:10,color:"#9a8a6a"}}>(20kg 미만)</span></div>
-              : totalQty>=20 ? <div style={{ fontSize:13, color:"#059669", marginBottom:6 }}>✓ 배송비 무료 ({totalQty}kg)</div> : null
+              ? <div style={{ fontSize:13, color:"#6b5b3a", marginBottom:6 }}>*배송비 {delivFee.toLocaleString()}원</div>
+              : <div style={{ fontSize:13, color:"#059669", marginBottom:6 }}>✓ 배송비 미포함</div>
             }
-            <div style={{ fontSize:18, fontWeight:900, color:"#8b6914", marginBottom:10 }}>총 금액 {total.toLocaleString()}원</div>
+            <div style={{ fontSize:18, fontWeight:900, color:"#8b6914", marginBottom:10 }}>총 수량 {totalQty}kg / 총 금액 {total.toLocaleString()}원</div>
             {payMethod === "account" ? (
               <>
                 <div style={{ fontSize:12, color:"#7a6a4a", marginBottom:10, padding:"8px 12px", borderRadius:8, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
@@ -471,7 +490,7 @@ function OrderForm({ analysis, items, group, clientName, orderNo, orderDate }) {
             }).join("\n")}{"\n"}
             {"\n"}
             {delivFee > 0 ? `*배송비 ${delivFee.toLocaleString()}원\n` : ""}
-            {`총 금액 ${total.toLocaleString()}원`}
+            {`총 수량 ${totalQty}kg / 총 금액 ${total.toLocaleString()}원`}
             {payMethod === "card" ? "\n\n*카드결제링크요청" : ""}
           </div>
         </div>
