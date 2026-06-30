@@ -53,6 +53,31 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // ── 공유 데이터 (단가표 / 거래처목록 / 재고표) ─────────────────────
+    // app_data 테이블: key(text, PK) | value(jsonb) | updated_at(timestamptz)
+    // 관리자가 업로드하면 이 키-값에 저장되고, 모든 사용자가 앱 로드 시 동일한 값을 불러옵니다.
+    if (req.method === "POST" && action === "save_shared") {
+      const { key, value } = payload || {};
+      if (!key) return res.status(400).json({ error: { message: "key 누락" } });
+      const { error } = await supabase
+        .from("app_data")
+        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      if (error) return res.status(400).json({ error });
+      return res.status(200).json({ success: true });
+    }
+
+    if (req.method === "POST" && action === "get_shared") {
+      const { key } = payload || {};
+      if (!key) return res.status(400).json({ error: { message: "key 누락" } });
+      const { data, error } = await supabase
+        .from("app_data")
+        .select("value, updated_at")
+        .eq("key", key)
+        .maybeSingle();
+      if (error) return res.status(400).json({ error });
+      return res.status(200).json({ data: data || null });
+    }
+
     return res.status(400).json({ error: "Unknown action" });
 
   } catch (e) {

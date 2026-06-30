@@ -1146,28 +1146,90 @@ function saveToStorage(key, value) {
 // ── 메인 ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]               = useState("order");
-  // priceList — 업로드 시 localStorage에 저장, 새로고침 후에도 유지
+  // priceList — localStorage(기기별 캐시) + Supabase(전체 공유) 동시 저장
   const [priceList, setPriceListState] = useState(() => loadFromStorage("bb_pricelist", INIT_PRICE_LIST));
-  function setPriceList(value) {
+  function setPriceList(value, skipShare) {
     const next = typeof value === "function" ? value(priceList) : value;
     saveToStorage("bb_pricelist", next);
     setPriceListState(next);
+    if (!skipShare) saveSharedData("pricelist", next);
   }
-  // clients — 업로드 시 localStorage에 저장, 새로고침 후에도 유지
+  // clients — localStorage(기기별 캐시) + Supabase(전체 공유) 동시 저장
   const [clients, setClientsState] = useState(() => loadFromStorage("bb_clients", INIT_CLIENTS));
-  function setClients(value) {
+  function setClients(value, skipShare) {
     const next = typeof value === "function" ? value(clients) : value;
     saveToStorage("bb_clients", next);
     setClientsState(next);
+    if (!skipShare) saveSharedData("clients", next);
   }
-  // 발주 이력 — localStorage에서 초기값 로드
+  // 발주 이력 — localStorage에서 초기값 로드 (이력은 기기별 — 공유 안 함)
   const [history, setHistoryState]  = useState(() => loadFromStorage("bb_history", []));
+  // stockMap — localStorage(기기별 캐시) + Supabase(전체 공유) 동시 저장
   const [stockMap, setStockMapState] = useState(() => loadFromStorage("bb_stockmap", {}));
-  function setStockMap(value) {
+  function setStockMap(value, skipShare) {
     const next = typeof value === "function" ? value(stockMap) : value;
     saveToStorage("bb_stockmap", next);
     setStockMapState(next);
+    if (!skipShare) saveSharedData("stockmap", next);
   }
+
+  // ── 공유 데이터 동기화 상태 ────────────────────────────────────────────
+  const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "synced" | "error"
+
+  // Supabase에 공유 데이터 저장 (단가표/거래처/재고표 업로드 시 호출)
+  async function saveSharedData(key, value) {
+    if (!DB_ENABLED) return;
+    try {
+      await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_shared", payload: { key, value } }),
+      });
+    } catch (e) {
+      console.error(`공유 데이터 저장 실패 (${key}):`, e);
+    }
+  }
+
+  // Supabase에서 공유 데이터 불러오기 (앱 시작 시 자동 실행)
+  async function fetchSharedData(key) {
+    if (!DB_ENABLED) return null;
+    try {
+      const res = await fetch("/api/db", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "get_shared", payload: { key } }),
+      });
+      const json = await res.json();
+      if (!res.ok || json.error) return null;
+      return json.data; // { value, updated_at } | null
+    } catch (e) {
+      console.error(`공유 데이터 조회 실패 (${key}):`, e);
+      return null;
+    }
+  }
+
+  // 앱 시작 시: Supabase에 저장된 최신 공유 데이터가 있으면 그것으로 동기화
+  // (관리자가 다른 기기에서 업로드한 최신본을 자동으로 반영)
+  useEffect(() => {
+    if (!DB_ENABLED) return;
+    let cancelled = false;
+    (async () => {
+      setSyncStatus("syncing");
+      const [pl, cl, sm] = await Promise.all([
+        fetchSharedData("pricelist"),
+        fetchSharedData("clients"),
+        fetchSharedData("stockmap"),
+      ]);
+      if (cancelled) return;
+      if (pl?.value) setPriceList(pl.value, true);
+      if (cl?.value) setClients(cl.value, true);
+      if (sm?.value) setStockMap(sm.value, true);
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(null), 2000);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // history 변경 시 자동으로 localStorage에 저장
   function setHistory(updater) {
@@ -1423,6 +1485,16 @@ export default function App() {
               }}>
                 {DB_ENABLED ? "DB●" : "DB○"}
               </button>
+              {syncStatus === "syncing" && (
+                <span style={{ fontSize:9, padding:"1px 6px", borderRadius:4, background:"#eff6ff", color:"#2563eb" }}>
+                  ⏳ 동기화중
+                </span>
+              )}
+              {syncStatus === "synced" && (
+                <span style={{ fontSize:9, padding:"1px 6px", borderRadius:4, background:"#f0fdf4", color:"#059669" }}>
+                  ✓ 최신화됨
+                </span>
+              )}
             </div>
           </div>
         </div>
