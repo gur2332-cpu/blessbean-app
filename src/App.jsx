@@ -731,61 +731,61 @@ function resolveGroup(raw) {
 function parseUploadedPriceList(rows) {
   if (!rows || rows.length < 2) return null;
 
-  const headerIdx = findHeaderRow(rows, ["품목", "coe", "하이", "스페셜", "프리미엄", "단가", "name"]);
+  // 헤더 행 탐지: 코드/품목명/단가 관련 키워드가 가장 많은 행
+  const headerIdx = findHeaderRow(rows, ["코드", "품목", "coe", "하이", "스페셜", "프리미엄", "단가", "name", "code"]);
   const rawHeaders = rows[headerIdx];
-  const headers = rawHeaders.map(h => cellStr(h).toLowerCase());
+  // 공백 제거 후 소문자로 비교 (예: "COE 단가" → "coe단가", "하이엔드 단가" → "하이엔드단가")
+  const headers = rawHeaders.map(h => cellStr(h).toLowerCase().replace(/\s/g, ""));
 
-  // 각 열 인덱스 찾기
   const col = {
-    name:    headers.findIndex(h => /품목명?|상품명?|원두명?|name/i.test(h)),
-    coe:     headers.findIndex(h => /coe/i.test(h)),
-    high:    headers.findIndex(h => /하이엔드|하이|high/i.test(h)),
-    special: headers.findIndex(h => /스페셜|special/i.test(h)),
-    premium: headers.findIndex(h => /프리미엄|premium/i.test(h)),
-    stock:   headers.findIndex(h => /재고|stock|잔여/i.test(h)),
-    origin:  headers.findIndex(h => /원산지|origin|생산지/i.test(h)),
-    process: headers.findIndex(h => /가공|process|프로세스/i.test(h)),
+    // 코드 열: "코드", "품목코드", "code", "item code", "itemcode" 모두 인식
+    code:    headers.findIndex(h => /^코드$|품목코드|^code$|itemcode|item_code/.test(h)),
+    // 품목명 열
+    name:    headers.findIndex(h => /품목명|상품명|원두명|^name$/.test(h)),
+    // 단가 열: 공백 제거 후 비교 (COE단가, coe단가, coe 모두 OK)
+    coe:     headers.findIndex(h => h.includes("coe")),
+    high:    headers.findIndex(h => h.includes("하이엔드") || h.includes("하이") || h.includes("high")),
+    special: headers.findIndex(h => h.includes("스페셜") || h.includes("special")),
+    premium: headers.findIndex(h => h.includes("프리미엄") || h.includes("premium")),
+    stock:   headers.findIndex(h => h.includes("재고") || h.includes("stock") || h.includes("잔여")),
+    origin:  headers.findIndex(h => h.includes("원산지") || h.includes("origin") || h.includes("생산지")),
+    process: headers.findIndex(h => h.includes("가공") || h.includes("process")),
   };
 
   // 품목명 열이 없으면 실패
   if (col.name === -1) return null;
 
-  // 인식된 열 목록 로그용
-  const recognized = Object.entries(col)
-    .filter(([,v]) => v >= 0)
-    .map(([k]) => k);
-
+  const seenCodes = new Set();
   const result = [];
   for (let i = headerIdx + 1; i < rows.length; i++) {
     const r = rows[i];
     const name = cellStr(r[col.name]);
-    if (!name || name === cellStr(rawHeaders[col.name])) continue; // 빈 행·헤더 반복 스킵
+    if (!name || name === cellStr(rawHeaders[col.name])) continue;
 
-    // 각 그룹 단가 — 없는 열은 0
+    // 품목코드: 코드 열이 있으면 사용, 없으면 순번 ID
+    const rawCode = col.code >= 0 ? cellStr(r[col.code]).trim() : "";
+    const id = rawCode && rawCode.length >= 3 ? rawCode : `UP-${String(i).padStart(3, "0")}`;
+    // 중복 코드 스킵
+    if (seenCodes.has(id)) continue;
+    seenCodes.add(id);
+
     const coe     = col.coe     >= 0 ? cellNum(r[col.coe])     : 0;
     const high    = col.high    >= 0 ? cellNum(r[col.high])    : 0;
     const special = col.special >= 0 ? cellNum(r[col.special]) : 0;
     const premium = col.premium >= 0 ? cellNum(r[col.premium]) : 0;
-
-    // 단가가 하나도 없는 행은 스킵
     if (coe + high + special + premium === 0) continue;
 
-    // 없는 단가는 가장 가까운 값으로 보완 (프리미엄 기준으로 올라감)
+    // 누락된 단가는 가장 가까운 값으로 보완
     const p = premium || special || high || coe;
     const s = special || premium || high || coe;
     const h = high    || special || premium || coe;
     const c = coe     || high    || special || premium;
 
-    // 키워드 자동 생성: 품목명의 첫 단어들
     const words = name.split(/\s+/).filter(w => w.length >= 2);
-    const keywords = [...new Set([
-      words[0],
-      words[1],
-      name.substring(0, 5),
-    ].filter(Boolean))];
+    const keywords = [...new Set([words[0], words[1], name.substring(0, 5)].filter(Boolean))];
 
     result.push({
-      id: `UP-${String(i).padStart(3, "0")}`,
+      id,
       name,
       keywords,
       origin:  col.origin  >= 0 ? cellStr(r[col.origin])  : "",
@@ -795,7 +795,7 @@ function parseUploadedPriceList(rows) {
     });
   }
 
-  return result.length > 0 ? { items: result, recognized } : null;
+  return result.length > 0 ? { items: result, recognized: Object.entries(col).filter(([,v])=>v>=0).map(([k])=>k) } : null;
 }
 
 // ── 거래처 목록 업로드 파서 ───────────────────────────────────────────────
