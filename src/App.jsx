@@ -1007,19 +1007,26 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
           setStatus(s=>({...s, stock:`🔍 시트 "${sheetName}" 읽는 중...`}));
         }
       } else if (type === "prices") {
-        // 단가표: 'DB' 시트 우선, 없으면 데이터가 가장 많은 시트 선택
-        const dbSheet = wb.SheetNames.find(n => n === "DB");
-        if (dbSheet) {
-          sheetName = dbSheet;
-        } else {
-          // 각 시트의 유효 행수를 비교해서 가장 많은 것 선택
-          let maxRows = 0;
-          for (const sn of wb.SheetNames) {
-            const tmp = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"" });
-            const validRows = tmp.filter(r => r.some(c => c !== "")).length;
-            if (validRows > maxRows) { maxRows = validRows; sheetName = sn; }
+        // 단가표: 헤더에 '품목명'+'코드/COE' 조합이 있는 시트 우선 선택
+        // (디자인용 시트 vs 데이터용 시트 구분)
+        const PRICE_KEYWORDS = ["품목명", "품목코드", "코드", "coe", "하이엔드", "스페셜", "프리미엄", "단가"];
+        let bestSheet = null;
+        let bestScore = 0;
+        for (const sn of wb.SheetNames) {
+          const tmp = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"" });
+          // 처음 10행 안에서 키워드 매칭 점수 계산
+          let score = 0;
+          for (let ri = 0; ri < Math.min(10, tmp.length); ri++) {
+            for (const cell of tmp[ri]) {
+              const cv = String(cell).toLowerCase().replace(/\s/g,"");
+              for (const kw of PRICE_KEYWORDS) {
+                if (cv.includes(kw)) { score++; break; }
+              }
+            }
           }
+          if (score > bestScore) { bestScore = score; bestSheet = sn; }
         }
+        if (bestSheet) sheetName = bestSheet;
       }
 
       const ws = wb.Sheets[sheetName];
@@ -1029,7 +1036,7 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
     if (type === "prices") {
       const parsed = parseUploadedPriceList(rows);
       if (!parsed || !parsed.items || parsed.items.length === 0) {
-        setStatus(s=>({...s, prices:"❌ 인식 실패 — 헤더에 '품목명', 'COE', '하이엔드', '스페셜', '프리미엄' 이 포함됐는지 확인하세요."}));
+        setStatus(s=>({...s, prices:"❌ 인식 실패 — 헤더에 '코드', '품목명', 'COE 단가', '하이엔드 단가', '스페셜 단가', '프리미엄 단가' 열이 있는지 확인하세요."}));
         return;
       }
       onPriceList(parsed.items);
@@ -1114,7 +1121,7 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
           </button>
         </div>
       )}
-      {zone("📊 단가표 업로드", "헤더: 품목명 | COE단가 | 하이엔드단가 | 스페셜단가 | 프리미엄단가 | (재고)", priceRef, "prices", status.prices)}
+      {zone("📊 단가표 업로드", "헤더: 코드 | 품목명 | COE 단가 | 하이엔드 단가 | 스페셜 단가 | 프리미엄 단가 (시트 자동 선택)", priceRef, "prices", status.prices)}
       {zone("🏪 거래처 목록 업로드", "헤더: 거래처명 | 대표자명 | 전화번호 | 단가그룹 | 담당영업사원", clientRef, "clients", status.clients)}
 
       <div style={{ padding:"14px", borderRadius:12, background:"#f5f0e8", border:"1px solid #e0d5b8" }}>
