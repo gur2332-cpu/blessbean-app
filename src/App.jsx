@@ -997,14 +997,28 @@ function UploadTab({ onPriceList, onClients, onStockMap, stockMap = {}, setStatu
       const buf = await file.arrayBuffer();
       const wb  = XLSX.read(buf, { type:"array" });
 
-      // 재고표는 날짜별 시트 중 가장 최근 것 자동 선택
+      // 시트 선택 로직
       let sheetName = wb.SheetNames[0];
       if (type === "stock") {
-        // 날짜 형태 시트명 필터 (예: 2026.05.08, 2026.4.1)
+        // 재고표: 날짜 형태 시트명 중 가장 최신 선택
         const dateSheets = wb.SheetNames.filter(n => /\d{4}\.\d+/.test(n));
         if (dateSheets.length > 0) {
-          sheetName = dateSheets[dateSheets.length - 1]; // 가장 마지막(최신)
+          sheetName = dateSheets[dateSheets.length - 1];
           setStatus(s=>({...s, stock:`🔍 시트 "${sheetName}" 읽는 중...`}));
+        }
+      } else if (type === "prices") {
+        // 단가표: 'DB' 시트 우선, 없으면 데이터가 가장 많은 시트 선택
+        const dbSheet = wb.SheetNames.find(n => n === "DB");
+        if (dbSheet) {
+          sheetName = dbSheet;
+        } else {
+          // 각 시트의 유효 행수를 비교해서 가장 많은 것 선택
+          let maxRows = 0;
+          for (const sn of wb.SheetNames) {
+            const tmp = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, defval:"" });
+            const validRows = tmp.filter(r => r.some(c => c !== "")).length;
+            if (validRows > maxRows) { maxRows = validRows; sheetName = sn; }
+          }
         }
       }
 
